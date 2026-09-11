@@ -2,18 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
+import { NeedsSociety } from "@/components/NeedsSociety";
 import type { Visitor } from "@/lib/cloudflare";
 import { getSelectedSociety } from "@/lib/society";
 
 export default function VisitorsPage() {
+  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
   const [rows, setRows] = useState<Visitor[]>([]);
   const [form, setForm] = useState({ name: "", flat: "", purpose: "Guest" });
 
-  const load = (society = getSelectedSociety()) =>
-    fetch(`/api/visitors?society=${society}`).then((r) => r.json()).then(setRows).catch(() => {});
+  const load = (id: string | null = society) => {
+    if (!id) { setRows([]); return; }
+    fetch(`/api/visitors?society=${id}`).then((r) => r.json()).then(setRows).catch(() => {});
+  };
   useEffect(() => {
-    load();
-    const onSwitch = (e: Event) => load((e as CustomEvent<string>).detail);
+    const id = getSelectedSociety();
+    if (id) {
+      fetch(`/api/visitors?society=${id}`)
+        .then((r) => r.json())
+        .then((data) => { if (data) setRows(data); })
+        .catch(() => {});
+    }
+    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
     window.addEventListener("vaseraos-society", onSwitch);
     return () => window.removeEventListener("vaseraos-society", onSwitch);
   }, []);
@@ -38,6 +48,15 @@ export default function VisitorsPage() {
     if (!confirm("Delete this visitor log?")) return;
     await fetch(`/api/visitors?id=${id}`, { method: "DELETE" });
     load();
+  }
+
+  if (!society) {
+    return (
+      <div>
+        <PageHeader title="Visitors" subtitle="Gate log — expected → checked in → checked out." />
+        <div className="mt-4"><NeedsSociety label="visitors" /></div>
+      </div>
+    );
   }
 
   return (

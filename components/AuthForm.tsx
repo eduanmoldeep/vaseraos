@@ -33,7 +33,7 @@ export function AuthForm({ onDone }: { onDone: (user: AuthUser) => void }) {
   };
 
   const input =
-    "w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20 dark:border-zinc-700 dark:bg-zinc-900";
+    "w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500";
 
   return (
     <Card>
@@ -42,7 +42,7 @@ export function AuthForm({ onDone }: { onDone: (user: AuthUser) => void }) {
           <button
             key={m}
             onClick={() => { setMode(m); setError(""); }}
-            className={`rounded-lg px-3 py-1.5 capitalize transition ${mode === m ? "bg-white shadow dark:bg-zinc-950" : "text-zinc-500"}`}
+            className={`rounded-lg px-3 py-1.5 capitalize transition ${mode === m ? "bg-white text-zinc-900 shadow dark:bg-zinc-950 dark:text-white" : "text-zinc-600 dark:text-zinc-400"}`}
           >
             {m === "login" ? "Log in" : "Sign up"}
           </button>

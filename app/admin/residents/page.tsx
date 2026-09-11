@@ -2,18 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
+import { NeedsSociety } from "@/components/NeedsSociety";
 import type { Resident } from "@/lib/cloudflare";
 import { getSelectedSociety } from "@/lib/society";
 
 export default function ResidentsPage() {
+  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
   const [rows, setRows] = useState<Resident[]>([]);
   const [form, setForm] = useState({ name: "", flat: "", phone: "" });
 
-  const load = (society = getSelectedSociety()) =>
-    fetch(`/api/residents?society=${society}`).then((r) => r.json()).then(setRows).catch(() => {});
+  const load = async (id: string | null = society) => {
+    if (!id) return;
+    const data = await fetch(`/api/residents?society=${id}`).then((r) => r.json()).catch(() => null);
+    if (data) setRows(data);
+  };
   useEffect(() => {
-    load();
-    const onSwitch = (e: Event) => load((e as CustomEvent<string>).detail);
+    const id = getSelectedSociety();
+    if (id) {
+      fetch(`/api/residents?society=${id}`)
+        .then((r) => r.json())
+        .then((data) => { if (data) setRows(data); })
+        .catch(() => {});
+    }
+    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
     window.addEventListener("vaseraos-society", onSwitch);
     return () => window.removeEventListener("vaseraos-society", onSwitch);
   }, []);
@@ -35,9 +46,18 @@ export default function ResidentsPage() {
     load();
   }
 
+  if (!society) {
+    return (
+      <div>
+        <PageHeader title="Residents" subtitle="Flats, owners, tenants & members." />
+        <div className="mt-4"><NeedsSociety label="residents" /></div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <PageHeader title="Residents" subtitle="Stored in Cloudflare D1 (demo data when running locally without bindings)." />
+      <PageHeader title="Residents" subtitle="Flats, owners, tenants & members." />
       <Card>
         <form onSubmit={add} className="grid gap-3 sm:grid-cols-4">
           <input required placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />

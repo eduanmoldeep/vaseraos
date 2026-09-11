@@ -21,7 +21,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const denied = await requireAdmin();
   if (denied) return denied;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   const bill = {
     id: uid("b"),
     flat: String(body.flat ?? "A-101"),
@@ -46,7 +47,8 @@ const BILL_STATUSES = ["pending", "paid", "overdue"] as const;
 export async function PATCH(req: Request) {
   const denied = await requireAdmin();
   if (denied) return denied;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   const id = String(body.id ?? "");
   const status = String(body.status ?? "");
   if (!id || !BILL_STATUSES.includes(status as (typeof BILL_STATUSES)[number])) {

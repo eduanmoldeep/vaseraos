@@ -34,6 +34,15 @@ export default function Landing() {
 
   return (
     <div>
+      <div className="mb-6 flex items-center justify-between">
+        <span className="flex items-center gap-2 font-semibold">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-800 to-emerald-600 text-sm font-bold text-white shadow">
+            V
+          </span>
+          VaseraOS
+        </span>
+        <span className="text-xs text-zinc-500">Society management, minus the paperwork</span>
+      </div>
       <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-teal-950 via-teal-900 to-emerald-800 p-6 text-white shadow-md sm:p-10">
         <div className="grid items-center gap-8 lg:grid-cols-2">
           <div>
@@ -41,7 +50,7 @@ export default function Landing() {
             <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
               Society management, minus the paperwork.
             </h1>
-            <p className="mt-3 max-w-md text-sm text-teal-100/85 sm:text-base">
+            <p className="mt-3 max-w-md text-sm text-teal-50 sm:text-base">
               VaseraOS keeps residents, dues, complaints, gate entries and notices in one fast,
               installable app that works from any phone.
             </p>
@@ -93,7 +102,7 @@ export default function Landing() {
         {[
           { t: "One app per society", d: "Admins switch between societies; every record stays scoped to its own." },
           { t: "Installable PWA", d: "Add VaseraOS to the home screen — icon, splash and standalone window included." },
-          { t: "Runs on Cloudflare", d: "Workers + D1 + R2 + KV: fast, global, and near-zero to operate." },
+          { t: "Fast on any phone", d: "Installs to the home screen and opens instantly on any device." },
         ].map((c) => (
           <Card key={c.t}>
             <p className="font-medium">{c.t}</p>

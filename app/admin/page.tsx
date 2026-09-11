@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
+import { NeedsSociety } from "@/components/NeedsSociety";
 import { getSelectedSociety } from "@/lib/society";
 
 type Summary = { residents: number; dues: number; openComplaints: number; activeVisitors: number };
@@ -14,20 +15,32 @@ const MODULES = [
   { href: "/admin/maintenance", title: "Maintenance", desc: "Bills, dues & collection", color: "bg-amber-500" },
   { href: "/admin/complaints", title: "Complaints", desc: "Tickets & resolution status", color: "bg-rose-500" },
   { href: "/admin/visitors", title: "Visitors", desc: "Gate entries & check-ins", color: "bg-violet-500" },
-  { href: "/admin/notices", title: "Notices", desc: "Announcements (R2 attachments)", color: "bg-emerald-500" },
+  { href: "/admin/notices", title: "Notices", desc: "Announcements with attachments", color: "bg-emerald-500" },
 ];
 
 export default function Home() {
+  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
   const [summary, setSummary] = useState<Summary | null>(null);
   const [notices, setNotices] = useState<Notice[]>([]);
 
-  const load = (society = getSelectedSociety()) => {
-    fetch(`/api/summary?society=${society}`).then((r) => r.json()).then(setSummary).catch(() => {});
-    fetch(`/api/notices?society=${society}`).then((r) => r.json()).then((d) => setNotices(d.slice(0, 3))).catch(() => {});
+  const load = (id: string | null = society) => {
+    if (!id) { setSummary(null); setNotices([]); return; }
+    fetch(`/api/summary?society=${id}`).then((r) => r.json()).then(setSummary).catch(() => {});
+    fetch(`/api/notices?society=${id}`).then((r) => r.json()).then((d) => setNotices(d.slice(0, 3))).catch(() => {});
   };
   useEffect(() => {
-    load();
-    const onSwitch = (e: Event) => load((e as CustomEvent<string>).detail);
+    const id = getSelectedSociety();
+    if (id) {
+      fetch(`/api/summary?society=${id}`)
+        .then((r) => r.json())
+        .then((data) => { if (data) setSummary(data); })
+        .catch(() => {});
+      fetch(`/api/notices?society=${id}`)
+        .then((r) => r.json())
+        .then((d) => { if (d) setNotices(d.slice(0, 3)); })
+        .catch(() => {});
+    }
+    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
     window.addEventListener("vaseraos-society", onSwitch);
     return () => window.removeEventListener("vaseraos-society", onSwitch);
   }, []);
@@ -45,21 +58,25 @@ export default function Home() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Society overview</h1>
-            <p className="mt-1 text-sm text-teal-100/80">Live from Cloudflare D1 (falls back to demo data locally).</p>
+            <p className="mt-1 text-sm text-teal-50">Live society data at a glance.</p>
           </div>
-          <Badge tone="green">Workers · D1 · R2 · KV</Badge>
+          <Badge tone="green">Live</Badge>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => (
-          <Card key={s.label} className={`overflow-hidden p-0`}>
-            <div className={`h-1.5 ${s.bar}`} />
-            <div className={`p-5 ${s.soft}`}>
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{s.label}</p>
-              <p className="mt-1 text-2xl font-semibold">{s.value}</p>
-            </div>
-          </Card>
-        ))}
+        {society ? (
+          stats.map((s) => (
+            <Card key={s.label} className={`overflow-hidden p-0`}>
+              <div className={`h-1.5 ${s.bar}`} />
+              <div className={`p-5 ${s.soft}`}>
+                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{s.label}</p>
+                <p className="mt-1 text-2xl font-semibold">{s.value}</p>
+              </div>
+            </Card>
+          ))
+        ) : (
+          <div className="sm:col-span-2 lg:col-span-4"><NeedsSociety label="dashboard stats" /></div>
+        )}
       </div>
 
       <div className="mt-8 grid gap-4 md:grid-cols-2">
@@ -84,6 +101,9 @@ export default function Home() {
         </Card>
         <Card>
           <h2 className="font-medium">Latest notices</h2>
+          {!society ? (
+            <p className="mt-3 text-sm text-zinc-500">Select a society to see notices.</p>
+          ) : (
           <div className="mt-3 space-y-3">
             {notices.length === 0 ? (
               <p className="text-sm text-zinc-500">No notices yet.</p>
@@ -96,6 +116,7 @@ export default function Home() {
               ))
             )}
           </div>
+          )}
           <Link href="/admin/notices" className="mt-4 inline-block text-sm font-medium underline">
             View all notices
           </Link>

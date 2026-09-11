@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -32,20 +31,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             __html: `if("serviceWorker" in navigator){addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}))}`,
           }}
         />
-        <header className="border-b border-teal-900/10">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-            <Link href="/" className="flex items-center gap-2 font-semibold">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-800 to-emerald-600 text-sm font-bold text-white shadow">
-                V
-              </span>
-              VaseraOS
-            </Link>
-            <span className="text-xs text-zinc-500">Society management, minus the paperwork</span>
-          </div>
-        </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
-        <footer className="border-t border-teal-900/10 py-6 text-center text-xs text-zinc-500 dark:border-white/10">
-          VaseraOS · installable PWA · Next.js on Cloudflare Workers · D1 + R2 + KV
+        <footer className="border-t border-teal-900/10 py-6 text-center text-xs text-zinc-600 dark:border-white/10 dark:text-zinc-400">
+          VaseraOS · Society management
         </footer>
       </body>
     </html>

@@ -18,7 +18,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const denied = await requireAdmin();
   if (denied) return denied;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Provide name" }, { status: 400 });
   const society = {
@@ -48,10 +49,11 @@ export async function DELETE(req: Request) {
   const env = await getEnv();
   if (env?.DB) {
     const tables = ["residents", "maintenance_bills", "complaints", "visitors", "notices"];
-    for (const t of tables) {
-      await env.DB.prepare(`DELETE FROM ${t} WHERE society_id = ?`).bind(id).run();
-    }
-    const res = await env.DB.prepare("DELETE FROM societies WHERE id = ?").bind(id).run();
+    const results = await env.DB.batch([
+      ...tables.map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE society_id = ?`).bind(id)),
+      env.DB.prepare("DELETE FROM societies WHERE id = ?").bind(id),
+    ]);
+    const res = results[results.length - 1];
     if (res.meta.changes === 0) {
       return NextResponse.json({ error: "Society not found" }, { status: 404 });
     }

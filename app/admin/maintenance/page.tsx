@@ -2,18 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
+import { NeedsSociety } from "@/components/NeedsSociety";
 import type { Bill } from "@/lib/cloudflare";
 import { getSelectedSociety } from "@/lib/society";
 
 export default function MaintenancePage() {
+  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
   const [rows, setRows] = useState<Bill[]>([]);
   const [form, setForm] = useState({ flat: "", amount: "", month: "2026-09" });
 
-  const load = (society = getSelectedSociety()) =>
-    fetch(`/api/bills?society=${society}`).then((r) => r.json()).then(setRows).catch(() => {});
+  const load = (id: string | null = society) => {
+    if (!id) { setRows([]); return; }
+    fetch(`/api/bills?society=${id}`).then((r) => r.json()).then(setRows).catch(() => {});
+  };
   useEffect(() => {
-    load();
-    const onSwitch = (e: Event) => load((e as CustomEvent<string>).detail);
+    const id = getSelectedSociety();
+    if (id) {
+      fetch(`/api/bills?society=${id}`)
+        .then((r) => r.json())
+        .then((data) => { if (data) setRows(data); })
+        .catch(() => {});
+    }
+    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
     window.addEventListener("vaseraos-society", onSwitch);
     return () => window.removeEventListener("vaseraos-society", onSwitch);
   }, []);
@@ -45,6 +55,15 @@ export default function MaintenancePage() {
   }
 
   const due = rows.filter((b) => b.status !== "paid").reduce((a, b) => a + b.amount, 0);
+
+  if (!society) {
+    return (
+      <div>
+        <PageHeader title="Maintenance" subtitle="Bills, dues & collection." />
+        <div className="mt-4"><NeedsSociety label="bills" /></div>
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -2,18 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
+import { NeedsSociety } from "@/components/NeedsSociety";
 import type { Complaint } from "@/lib/cloudflare";
 import { getSelectedSociety } from "@/lib/society";
 
 export default function ComplaintsPage() {
+  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
   const [rows, setRows] = useState<Complaint[]>([]);
   const [form, setForm] = useState({ flat: "", title: "", category: "general" });
 
-  const load = (society = getSelectedSociety()) =>
-    fetch(`/api/complaints?society=${society}`).then((r) => r.json()).then(setRows).catch(() => {});
+  const load = (id: string | null = society) => {
+    if (!id) { setRows([]); return; }
+    fetch(`/api/complaints?society=${id}`).then((r) => r.json()).then(setRows).catch(() => {});
+  };
   useEffect(() => {
-    load();
-    const onSwitch = (e: Event) => load((e as CustomEvent<string>).detail);
+    const id = getSelectedSociety();
+    if (id) {
+      fetch(`/api/complaints?society=${id}`)
+        .then((r) => r.json())
+        .then((data) => { if (data) setRows(data); })
+        .catch(() => {});
+    }
+    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
     window.addEventListener("vaseraos-society", onSwitch);
     return () => window.removeEventListener("vaseraos-society", onSwitch);
   }, []);
@@ -40,9 +50,18 @@ export default function ComplaintsPage() {
     load();
   }
 
+  if (!society) {
+    return (
+      <div>
+        <PageHeader title="Complaints" subtitle="Track tickets from open to resolved." />
+        <div className="mt-4"><NeedsSociety label="complaints" /></div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <PageHeader title="Complaints" subtitle="Tickets flow into D1; triage by status." />
+      <PageHeader title="Complaints" subtitle="Track tickets from open to resolved." />
       <Card>
         <form onSubmit={add} className="grid gap-3 sm:grid-cols-4">
           <input required placeholder="Flat" value={form.flat} onChange={(e) => setForm({ ...form, flat: e.target.value })} className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />

@@ -2,18 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { Card, Empty, PageHeader } from "@/components/ui";
+import { NeedsSociety } from "@/components/NeedsSociety";
 import type { Notice } from "@/lib/cloudflare";
 import { getSelectedSociety } from "@/lib/society";
 
 export default function NoticesPage() {
+  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
   const [rows, setRows] = useState<Notice[]>([]);
   const [form, setForm] = useState({ title: "", body: "" });
 
-  const load = (society = getSelectedSociety()) =>
-    fetch(`/api/notices?society=${society}`).then((r) => r.json()).then(setRows).catch(() => {});
+  const load = (id: string | null = society) => {
+    if (!id) { setRows([]); return; }
+    fetch(`/api/notices?society=${id}`).then((r) => r.json()).then(setRows).catch(() => {});
+  };
   useEffect(() => {
-    load();
-    const onSwitch = (e: Event) => load((e as CustomEvent<string>).detail);
+    const id = getSelectedSociety();
+    if (id) {
+      fetch(`/api/notices?society=${id}`)
+        .then((r) => r.json())
+        .then((data) => { if (data) setRows(data); })
+        .catch(() => {});
+    }
+    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
     window.addEventListener("vaseraos-society", onSwitch);
     return () => window.removeEventListener("vaseraos-society", onSwitch);
   }, []);
@@ -35,9 +45,18 @@ export default function NoticesPage() {
     load();
   }
 
+  if (!society) {
+    return (
+      <div>
+        <PageHeader title="Notices" subtitle="Announcements with optional file attachments." />
+        <div className="mt-4"><NeedsSociety label="notices" /></div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <PageHeader title="Notices" subtitle="Announcements in D1; file attachments go to the UPLOADS R2 bucket." />
+      <PageHeader title="Notices" subtitle="Announcements with optional file attachments." />
       <Card>
         <form onSubmit={add} className="grid gap-3">
           <input required placeholder="Notice title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />

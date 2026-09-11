@@ -11,7 +11,7 @@ export default function SocietiesPage() {
   const [rows, setRows] = useState<Society[]>([]);
   const [counts, setCounts] = useState<Counts>({});
   const [form, setForm] = useState({ name: "", city: "" });
-  const [current, setCurrent] = useState<string>(getSelectedSociety());
+  const [current, setCurrent] = useState<string | null>(() => getSelectedSociety());
 
   const load = () => {
     fetch("/api/societies")
@@ -55,12 +55,9 @@ export default function SocietiesPage() {
   async function remove(id: string, name: string) {
     if (!confirm(`Delete "${name}" and ALL its residents, bills, complaints, visitors and notices?`)) return;
     await fetch(`/api/societies?id=${id}`, { method: "DELETE" });
-    if (current === id && rows.length > 0) {
-      const next = rows.find((s) => s.id !== id);
-      if (next) {
-        setSelectedSociety(next.id);
-        setCurrent(next.id);
-      }
+    if (current === id) {
+      setSelectedSociety(null);
+      setCurrent(null);
     }
     load();
   }

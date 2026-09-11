@@ -21,7 +21,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const denied = await requireAdmin();
   if (denied) return denied;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   const visitor = {
     id: uid("v"),
     name: String(body.name ?? "Guest"),
@@ -49,7 +50,8 @@ const VISITOR_STATUSES = ["expected", "checked_in", "checked_out"] as const;
 export async function PATCH(req: Request) {
   const denied = await requireAdmin();
   if (denied) return denied;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   const id = String(body.id ?? "");
   const status = String(body.status ?? "");
   if (!id || !VISITOR_STATUSES.includes(status as (typeof VISITOR_STATUSES)[number])) {
