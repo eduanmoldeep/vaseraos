@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { DEFAULT_SOCIETY_ID, getEnv, mockStore } from "@/lib/cloudflare";
+import { requireAdmin } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 // Aggregated dashboard numbers — served from D1 on Cloudflare, mock locally.
 // Scoped by ?society=<id>; ?society=all for platform-wide totals.
 export async function GET(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const society = new URL(req.url).searchParams.get("society") ?? DEFAULT_SOCIETY_ID;
   const scoped = society !== "all";
   const env = await getEnv();

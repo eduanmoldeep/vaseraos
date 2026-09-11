@@ -2,104 +2,104 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AuthForm } from "@/components/AuthForm";
 import { Badge, Card } from "@/components/ui";
-import { getSelectedSociety } from "@/lib/society";
+import type { AuthUser } from "@/lib/cloudflare";
 
-type Summary = { residents: number; dues: number; openComplaints: number; activeVisitors: number };
-type Notice = { id: string; title: string; body: string };
-
-const MODULES = [
-  { href: "/societies", title: "Societies", desc: "Admin: tenants & switching", color: "bg-teal-500" },
-  { href: "/residents", title: "Residents", desc: "Flats, owners, tenants & members", color: "bg-sky-500" },
-  { href: "/maintenance", title: "Maintenance", desc: "Bills, dues & collection", color: "bg-amber-500" },
-  { href: "/complaints", title: "Complaints", desc: "Tickets & resolution status", color: "bg-rose-500" },
-  { href: "/visitors", title: "Visitors", desc: "Gate entries & check-ins", color: "bg-violet-500" },
-  { href: "/notices", title: "Notices", desc: "Announcements (R2 attachments)", color: "bg-emerald-500" },
+const FEATURES = [
+  { title: "Residents", desc: "Flats, owners, tenants & members", color: "bg-sky-500" },
+  { title: "Maintenance", desc: "Bills, dues & collection", color: "bg-amber-500" },
+  { title: "Complaints", desc: "Tickets & resolution status", color: "bg-rose-500" },
+  { title: "Visitors", desc: "Gate entries & check-ins", color: "bg-violet-500" },
+  { title: "Notices", desc: "Announcements with attachments", color: "bg-emerald-500" },
+  { title: "Societies", desc: "Multi-society admin switching", color: "bg-teal-500" },
 ];
 
-export default function Home() {
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [notices, setNotices] = useState<Notice[]>([]);
+export default function Landing() {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [checked, setChecked] = useState(false);
 
-  const load = (society = getSelectedSociety()) => {
-    fetch(`/api/summary?society=${society}`).then((r) => r.json()).then(setSummary).catch(() => {});
-    fetch(`/api/notices?society=${society}`).then((r) => r.json()).then((d) => setNotices(d.slice(0, 3))).catch(() => {});
-  };
   useEffect(() => {
-    load();
-    const onSwitch = (e: Event) => load((e as CustomEvent<string>).detail);
-    window.addEventListener("vaseraos-society", onSwitch);
-    return () => window.removeEventListener("vaseraos-society", onSwitch);
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setUser(d?.user ?? null))
+      .catch(() => {})
+      .finally(() => setChecked(true));
   }, []);
 
-  const stats = [
-    { label: "Residents", value: summary?.residents ?? "—", bar: "bg-sky-500", soft: "bg-sky-50 dark:bg-sky-950/40" },
-    { label: "Outstanding dues", value: summary ? `₹${summary.dues.toLocaleString("en-IN")}` : "—", bar: "bg-amber-500", soft: "bg-amber-50 dark:bg-amber-950/40" },
-    { label: "Open complaints", value: summary?.openComplaints ?? "—", bar: "bg-rose-500", soft: "bg-rose-50 dark:bg-rose-950/40" },
-    { label: "Active visitors", value: summary?.activeVisitors ?? "—", bar: "bg-emerald-500", soft: "bg-emerald-50 dark:bg-emerald-950/40" },
-  ];
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    setUser(null);
+  };
 
   return (
     <div>
-      <div className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-teal-950 via-teal-900 to-emerald-800 p-6 text-white shadow-md">
-        <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-teal-950 via-teal-900 to-emerald-800 p-6 text-white shadow-md sm:p-10">
+        <div className="grid items-center gap-8 lg:grid-cols-2">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Society overview</h1>
-            <p className="mt-1 text-sm text-teal-100/80">Live from Cloudflare D1 (falls back to demo data locally).</p>
-          </div>
-          <Badge tone="green">Workers · D1 · R2 · KV</Badge>
-        </div>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => (
-          <Card key={s.label} className={`overflow-hidden p-0`}>
-            <div className={`h-1.5 ${s.bar}`} />
-            <div className={`p-5 ${s.soft}`}>
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{s.label}</p>
-              <p className="mt-1 text-2xl font-semibold">{s.value}</p>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
-        <Card>
-          <h2 className="font-medium">Modules</h2>
-          <ul className="mt-3 space-y-2">
-            {MODULES.map((m) => (
-              <li key={m.href}>
-                <Link href={m.href} className="flex items-center gap-3 rounded-xl border border-zinc-200 px-4 py-3 transition hover:-translate-y-px hover:shadow-sm dark:border-zinc-800 dark:hover:bg-zinc-900">
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold text-white ${m.color}`}>
-                    {m.title[0]}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">{m.title}</span>
-                    <span className="block truncate text-xs text-zinc-500">{m.desc}</span>
-                  </span>
-                  <span aria-hidden className="ml-auto">→</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
-        <Card>
-          <h2 className="font-medium">Latest notices</h2>
-          <div className="mt-3 space-y-3">
-            {notices.length === 0 ? (
-              <p className="text-sm text-zinc-500">No notices yet.</p>
-            ) : (
-              notices.map((n) => (
-                <div key={n.id} className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-900">
-                  <p className="text-sm font-medium">{n.title}</p>
-                  <p className="mt-1 line-clamp-2 text-xs text-zinc-500">{n.body}</p>
+            <Badge tone="green">Residents · Maintenance · Visitors · Notices</Badge>
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
+              Society management, minus the paperwork.
+            </h1>
+            <p className="mt-3 max-w-md text-sm text-teal-100/85 sm:text-base">
+              VaseraOS keeps residents, dues, complaints, gate entries and notices in one fast,
+              installable app that works from any phone.
+            </p>
+            <div className="mt-5 grid max-w-md grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+              {FEATURES.map((f) => (
+                <div key={f.title} className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${f.color}`} />
+                  {f.title}
                 </div>
-              ))
+              ))}
+            </div>
+          </div>
+          <div className="w-full max-w-sm justify-self-center lg:justify-self-end">
+            {!checked ? (
+              <Card><p className="py-6 text-center text-sm text-zinc-500">Loading…</p></Card>
+            ) : !user ? (
+              <AuthForm onDone={setUser} />
+            ) : user.admin ? (
+              <Card>
+                <p className="text-sm text-zinc-500">Signed in as</p>
+                <p className="mt-1 font-semibold">{user.name}</p>
+                <Link
+                  href="/admin"
+                  className="mt-4 block rounded-xl bg-gradient-to-r from-teal-800 to-emerald-600 px-3 py-2.5 text-center text-sm font-semibold text-white shadow hover:brightness-110"
+                >
+                  Open admin dashboard →
+                </Link>
+                <button onClick={logout} className="mt-2 w-full py-1 text-xs text-zinc-500 underline">
+                  Log out
+                </button>
+              </Card>
+            ) : (
+              <Card>
+                <p className="font-semibold">Hi {user.name} 👋</p>
+                <p className="mt-2 text-sm text-zinc-500">
+                  Your account is created. The management modules are admin-only — ask your society
+                  admin to enable access for {user.email}.
+                </p>
+                <button onClick={logout} className="mt-4 text-sm font-medium underline">
+                  Log out
+                </button>
+              </Card>
             )}
           </div>
-          <Link href="/notices" className="mt-4 inline-block text-sm font-medium underline">
-            View all notices
-          </Link>
-        </Card>
+        </div>
+      </div>
+
+      <div className="mt-8 grid gap-4 md:grid-cols-3">
+        {[
+          { t: "One app per society", d: "Admins switch between societies; every record stays scoped to its own." },
+          { t: "Installable PWA", d: "Add VaseraOS to the home screen — icon, splash and standalone window included." },
+          { t: "Runs on Cloudflare", d: "Workers + D1 + R2 + KV: fast, global, and near-zero to operate." },
+        ].map((c) => (
+          <Card key={c.t}>
+            <p className="font-medium">{c.t}</p>
+            <p className="mt-1 text-sm text-zinc-500">{c.d}</p>
+          </Card>
+        ))}
       </div>
     </div>
   );

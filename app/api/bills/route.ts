@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { getEnv, mockStore, uid, DEFAULT_SOCIETY_ID, type Bill } from "@/lib/cloudflare";
+import { requireAdmin } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const society_id = new URL(req.url).searchParams.get("society") ?? DEFAULT_SOCIETY_ID;
   const env = await getEnv();
   if (env?.DB) {
@@ -16,6 +19,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const body = await req.json();
   const bill = {
     id: uid("b"),
@@ -39,6 +44,8 @@ export async function POST(req: Request) {
 const BILL_STATUSES = ["pending", "paid", "overdue"] as const;
 
 export async function PATCH(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const body = await req.json();
   const id = String(body.id ?? "");
   const status = String(body.status ?? "");
@@ -63,6 +70,8 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const id = new URL(req.url).searchParams.get("id") ?? "";
   if (!id) return NextResponse.json({ error: "Provide ?id=" }, { status: 400 });
   const env = await getEnv();

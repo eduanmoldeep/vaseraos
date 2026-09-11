@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { DEFAULT_SOCIETY_ID, getEnv, mockStore, uid } from "@/lib/cloudflare";
+import { requireAdmin } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const env = await getEnv();
   if (env?.DB) {
     const { results } = await env.DB.prepare("SELECT * FROM societies ORDER BY name").all();
@@ -13,6 +16,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const body = await req.json();
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Provide name" }, { status: 400 });
@@ -33,6 +38,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const id = new URL(req.url).searchParams.get("id") ?? "";
   if (!id) return NextResponse.json({ error: "Provide ?id=" }, { status: 400 });
   if (id === DEFAULT_SOCIETY_ID) {

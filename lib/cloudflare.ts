@@ -28,6 +28,9 @@ export type Society = {
 
 export const DEFAULT_SOCIETY_ID = "s_default";
 
+/** Account holder. `admin` is granted only by direct DB SQL — never via API/UI. */
+export type AuthUser = { id: string; name: string; email: string; admin: boolean };
+
 export type Resident = {
   id: string;
   name: string;

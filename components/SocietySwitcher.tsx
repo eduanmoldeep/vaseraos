@@ -47,7 +47,7 @@ export function SocietySwitcher() {
         ))}
       </select>
       <Link
-        href="/societies"
+        href="/admin/societies"
         className="rounded-full px-2 py-1.5 text-xs font-medium text-zinc-500 underline hover:text-zinc-900 dark:hover:text-white"
       >
         Manage
