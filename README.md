@@ -37,3 +37,9 @@ npm run preview  # local Workers preview
 ```
 
 API routes in `app/api/*` use `getCloudflareContext()` → `env.DB` / `env.UPLOADS` / `env.SESSIONS`, with an in-memory fallback so `next dev` works before bindings exist.
+
+## Security — secret files are never served
+
+- `proxy.ts` returns **404** for any request whose first path segment is a dotfile (`/.env`, `/.env.local`, `/.git/*`, `/.dev.vars`, …). `/.well-known/*` stays public for ACME/security.txt.
+- `.gitignore` blocks `.env*` and `.dev.vars` — only `.dev.vars.example` (placeholder values) is committed. Secrets live in Cloudflare (`wrangler secret put`, `.dev.vars` locally).
+- Optional extra layer: add a Cloudflare WAF custom rule blocking URI paths containing `/.env`.
