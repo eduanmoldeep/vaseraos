@@ -1,15 +1,20 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
   "name": "vaseraos",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
-  // D1 — relational store for residents, flats, bills, complaints, visitors, notices
+  // OpenNext build output: worker entry-point + static assets.
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+
+  // D1 — relational store for societies, residents, bills, complaints, visitors, notices
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "vaseraos-db",
+      "database_id": "cb5bff7d-e5f9-4c78-846b-869af6ff85fc",
       "migrations_dir": "db/migrations"
     }
   ],
@@ -18,5 +23,21 @@
   "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "vaseraos-uploads" }],
 
   // KV — lightweight session / feature-flag / cache store
-  "kv_namespaces": [{ "binding": "SESSIONS", "id": "local-sessions" }]
+  "kv_namespaces": [{ "binding": "SESSIONS", "id": "bfc27c47d8f046f2987fc15d86748bf6" }],
+
+  "env": {
+    "staging": {
+      "name": "vaseraos-staging",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "vaseraos-db-staging",
+          "database_id": "f665b087-b32b-41aa-8ec2-274407c5bc03",
+          "migrations_dir": "db/migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "vaseraos-uploads-staging" }],
+      "kv_namespaces": [{ "binding": "SESSIONS", "id": "ef852dd906ff48188879cbe6ad6da90e" }]
+    }
+  }
 }

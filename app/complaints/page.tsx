@@ -3,18 +3,40 @@
 import { useEffect, useState } from "react";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import type { Complaint } from "@/lib/cloudflare";
+import { getSelectedSociety } from "@/lib/society";
 
 export default function ComplaintsPage() {
   const [rows, setRows] = useState<Complaint[]>([]);
   const [form, setForm] = useState({ flat: "", title: "", category: "general" });
 
-  const load = () => fetch("/api/complaints").then((r) => r.json()).then(setRows).catch(() => {});
-  useEffect(() => { load(); }, []);
+  const load = (society = getSelectedSociety()) =>
+    fetch(`/api/complaints?society=${society}`).then((r) => r.json()).then(setRows).catch(() => {});
+  useEffect(() => {
+    load();
+    const onSwitch = (e: Event) => load((e as CustomEvent<string>).detail);
+    window.addEventListener("vaseraos-society", onSwitch);
+    return () => window.removeEventListener("vaseraos-society", onSwitch);
+  }, []);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    await fetch("/api/complaints", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(form) });
+    await fetch("/api/complaints", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, society_id: getSelectedSociety() }) });
     setForm({ flat: "", title: "", category: "general" });
+    load();
+  }
+
+  async function setStatus(id: string, status: string) {
+    await fetch("/api/complaints", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, status }),
+    });
+    load();
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this complaint?")) return;
+    await fetch(`/api/complaints?id=${id}`, { method: "DELETE" });
     load();
   }
 
@@ -42,7 +64,26 @@ export default function ComplaintsPage() {
               <p className="font-medium">{c.title}</p>
               <p className="text-xs text-zinc-500">{c.flat} · {c.category}</p>
             </div>
-            <Badge tone={c.status === "resolved" ? "green" : c.status === "in_progress" ? "blue" : "amber"}>{c.status.replace("_", " ")}</Badge>
+            <div className="flex items-center gap-2">
+              <Badge tone={c.status === "resolved" ? "green" : c.status === "in_progress" ? "blue" : "amber"}>{c.status.replace("_", " ")}</Badge>
+              <select
+                value={c.status}
+                onChange={(e) => setStatus(c.id, e.target.value)}
+                className="rounded-lg border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                aria-label={`Complaint status for ${c.title}`}
+              >
+                <option value="open">open</option>
+                <option value="in_progress">in progress</option>
+                <option value="resolved">resolved</option>
+              </select>
+              <button
+                onClick={() => remove(c.id)}
+                className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                aria-label={`Delete complaint ${c.title}`}
+              >
+                Delete
+              </button>
+            </div>
           </Card>
         ))}
       </div>

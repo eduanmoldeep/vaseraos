@@ -3,18 +3,35 @@
 import { useEffect, useState } from "react";
 import { Card, Empty, PageHeader } from "@/components/ui";
 import type { Notice } from "@/lib/cloudflare";
+import { getSelectedSociety } from "@/lib/society";
 
 export default function NoticesPage() {
   const [rows, setRows] = useState<Notice[]>([]);
   const [form, setForm] = useState({ title: "", body: "" });
 
-  const load = () => fetch("/api/notices").then((r) => r.json()).then(setRows).catch(() => {});
-  useEffect(() => { load(); }, []);
+  const load = (society = getSelectedSociety()) =>
+    fetch(`/api/notices?society=${society}`).then((r) => r.json()).then(setRows).catch(() => {});
+  useEffect(() => {
+    load();
+    const onSwitch = (e: Event) => load((e as CustomEvent<string>).detail);
+    window.addEventListener("vaseraos-society", onSwitch);
+    return () => window.removeEventListener("vaseraos-society", onSwitch);
+  }, []);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    await fetch("/api/notices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(form) });
+    await fetch("/api/notices", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...form, society_id: getSelectedSociety() }),
+    });
     setForm({ title: "", body: "" });
+    load();
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this notice?")) return;
+    await fetch(`/api/notices?id=${id}`, { method: "DELETE" });
     load();
   }
 
@@ -30,9 +47,18 @@ export default function NoticesPage() {
       </Card>
       <div className="mt-4 grid gap-3">
         {rows.length === 0 ? <Empty text="No notices yet." /> : rows.map((n) => (
-          <Card key={n.id}>
-            <p className="font-medium">{n.title}</p>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{n.body}</p>
+          <Card key={n.id} className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-medium">{n.title}</p>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{n.body}</p>
+            </div>
+            <button
+              onClick={() => remove(n.id)}
+              className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+              aria-label={`Delete notice ${n.title}`}
+            >
+              Delete
+            </button>
           </Card>
         ))}
       </div>

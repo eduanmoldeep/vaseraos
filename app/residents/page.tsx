@@ -3,22 +3,35 @@
 import { useEffect, useState } from "react";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import type { Resident } from "@/lib/cloudflare";
+import { getSelectedSociety } from "@/lib/society";
 
 export default function ResidentsPage() {
   const [rows, setRows] = useState<Resident[]>([]);
   const [form, setForm] = useState({ name: "", flat: "", phone: "" });
 
-  const load = () => fetch("/api/residents").then((r) => r.json()).then(setRows).catch(() => {});
-  useEffect(() => { load(); }, []);
+  const load = (society = getSelectedSociety()) =>
+    fetch(`/api/residents?society=${society}`).then((r) => r.json()).then(setRows).catch(() => {});
+  useEffect(() => {
+    load();
+    const onSwitch = (e: Event) => load((e as CustomEvent<string>).detail);
+    window.addEventListener("vaseraos-society", onSwitch);
+    return () => window.removeEventListener("vaseraos-society", onSwitch);
+  }, []);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
     await fetch("/api/residents", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, society_id: getSelectedSociety() }),
     });
     setForm({ name: "", flat: "", phone: "" });
+    load();
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Remove this resident?")) return;
+    await fetch(`/api/residents?id=${id}`, { method: "DELETE" });
     load();
   }
 
@@ -40,7 +53,16 @@ export default function ResidentsPage() {
               <p className="font-medium">{r.name} <span className="text-zinc-500">· {r.flat}</span></p>
               <p className="text-xs text-zinc-500">{r.phone} · {r.members} members</p>
             </div>
-            <Badge tone={r.owner_tenant === "owner" ? "blue" : "amber"}>{r.owner_tenant}</Badge>
+            <div className="flex items-center gap-2">
+              <Badge tone={r.owner_tenant === "owner" ? "blue" : "amber"}>{r.owner_tenant}</Badge>
+              <button
+                onClick={() => remove(r.id)}
+                className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                aria-label={`Remove resident ${r.name}`}
+              >
+                Delete
+              </button>
+            </div>
           </Card>
         ))}
       </div>

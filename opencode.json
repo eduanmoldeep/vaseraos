@@ -16,5 +16,6 @@
       "**/.env.*": "deny",
       "**/.dev.vars": "deny"
     }
-  }
+  },
+  "plugin": ["@dietrichgebert/ponytail"]
 }
