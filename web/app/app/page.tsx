@@ -26,12 +26,15 @@ export default function ResidentApp() {
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [error, setError] = useState("");
   const [myFlat, setMyFlat] = useState<string | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
   const [myOpenComplaints, setMyOpenComplaints] = useState<number | null>(null);
-  const [visitorForm, setVisitorForm] = useState({ name: "", flat: "", purpose: "Guest" });
+  const [ledgerBalance, setLedgerBalance] = useState<number | null>(null);
+  const [visitorForm, setVisitorForm] = useState({ name: "", purpose: "Guest" });
   const [savingVisitor, setSavingVisitor] = useState(false);
   const [sosFlat, setSosFlat] = useState("");
   const [sosAlert, setSosAlert] = useState<SosAlert | null>(null);
   const [raisingSos, setRaisingSos] = useState(false);
+  const [confirmingSos, setConfirmingSos] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -61,10 +64,17 @@ export default function ResidentApp() {
     fetch(`/api/summary?society=${id}`).then((r) => r.json()).then(setSummary).catch(() => {});
     fetch(`/api/notices?society=${id}`).then((r) => r.json()).then(setNotices).catch(() => {});
     fetch(`/api/visitors?society=${id}`).then((r) => r.json()).then(setVisitors).catch(() => {});
-    fetch(`/api/me/flat?society=${id}`).then((r) => r.json()).then((d) => setMyFlat(d?.flat ?? null)).catch(() => {});
+    fetch(`/api/me/flat?society=${id}`)
+      .then((r) => r.json())
+      .then((d) => { setMyFlat(d?.flat ?? null); setIsOwner(d?.owner_tenant === "owner"); })
+      .catch(() => {});
     fetch(`/api/complaints?society=${id}&mine=1`)
       .then((r) => (r.ok ? r.json() : []))
       .then((rows: { status: string }[]) => setMyOpenComplaints(rows.filter((c) => c.status !== "resolved").length))
+      .catch(() => {});
+    fetch(`/api/ledger?society=${id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setLedgerBalance(d?.balance ?? null))
       .catch(() => {});
     fetch(`/api/sos?society=${id}`)
       .then((r) => r.json())
@@ -86,18 +96,27 @@ export default function ResidentApp() {
     return () => clearInterval(id);
   }, [activeId, sosAlert]);
 
-  async function raiseSos(e: React.FormEvent) {
+  function requestSos(e: React.FormEvent) {
     e.preventDefault();
     if (!activeId) return;
+    const flat = myFlat ?? sosFlat;
+    if (!flat) return;
+    setConfirmingSos(true);
+  }
+
+  async function confirmSos() {
+    const flat = myFlat ?? sosFlat;
+    if (!activeId || !flat) return;
     setRaisingSos(true);
     try {
       const res = await fetch("/api/sos", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ society_id: activeId, flat: sosFlat }),
+        body: JSON.stringify({ society_id: activeId, flat }),
       });
       const data = await res.json();
       setSosAlert(data);
+      setConfirmingSos(false);
     } finally {
       setRaisingSos(false);
     }
@@ -105,15 +124,15 @@ export default function ResidentApp() {
 
   async function preApproveVisitor(e: React.FormEvent) {
     e.preventDefault();
-    if (!activeId) return;
+    if (!activeId || !myFlat) return;
     setSavingVisitor(true);
     try {
       await fetch("/api/visitors", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...visitorForm, society_id: activeId }),
+        body: JSON.stringify({ ...visitorForm, flat: myFlat, society_id: activeId }),
       });
-      setVisitorForm({ name: "", flat: "", purpose: "Guest" });
+      setVisitorForm({ name: "", purpose: "Guest" });
       loadSociety(activeId);
     } finally {
       setSavingVisitor(false);
@@ -172,15 +191,26 @@ export default function ResidentApp() {
             <Badge tone={sosAlert.status === "acknowledged" ? "green" : "amber"}>{sosAlert.status}</Badge>
           </div>
         ) : (
-          <form onSubmit={raiseSos} className="flex flex-wrap items-center gap-3">
-            <Input required placeholder="Your flat" value={sosFlat} onChange={(e) => setSosFlat(e.target.value)} className="max-w-[10rem]" />
-            <Button variant="danger" busy={raisingSos} busyText="Raising SOS…">🚨 Raise SOS</Button>
-            <p className="text-sm text-zinc-500">Alerts the society&apos;s guard and office-holders immediately.</p>
+          <form onSubmit={requestSos} className="flex flex-wrap items-center gap-3">
+            {!myFlat ? (
+              <Input required placeholder="Your flat" value={sosFlat} onChange={(e) => setSosFlat(e.target.value)} className="max-w-[10rem]" />
+            ) : null}
+            <Button variant="danger" busy={raisingSos} busyText="Raising SOS…">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M12 3 2 20h20L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                <path d="M12 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
+              </svg>
+              Raise SOS
+            </Button>
+            <p className="text-sm text-zinc-500">
+              {myFlat ? `Alerts the guard and office-holders for flat ${myFlat} immediately.` : "Alerts the society's guard and office-holders immediately."}
+            </p>
           </form>
         )}
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className={`grid gap-4 sm:grid-cols-2 ${isOwner ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         <Card>
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Dues</p>
           <p className="mt-1 text-xl font-semibold">{summary ? `₹${summary.dues.toLocaleString("en-IN")}` : "—"}</p>
@@ -195,6 +225,14 @@ export default function ResidentApp() {
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Active visitors</p>
           <p className="mt-1 text-xl font-semibold">{summary?.activeVisitors ?? "—"}</p>
         </Card>
+        {isOwner ? (
+          <Link href="/ledger">
+            <Card className="transition hover:bg-zinc-50 dark:hover:bg-zinc-900">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Society balance</p>
+              <p className="mt-1 text-xl font-semibold">{ledgerBalance !== null ? `₹${ledgerBalance.toLocaleString("en-IN")}` : "—"}</p>
+            </Card>
+          </Link>
+        ) : null}
       </div>
 
       <div className="mt-6">
@@ -232,17 +270,23 @@ export default function ResidentApp() {
         <div>
           <PageHeader title="Visitors" />
           <Card>
-            <form onSubmit={preApproveVisitor} className="grid gap-2">
-              <Input required placeholder="Visitor name" value={visitorForm.name} onChange={(e) => setVisitorForm({ ...visitorForm, name: e.target.value })} />
-              <Input required placeholder="Flat to visit" value={visitorForm.flat} onChange={(e) => setVisitorForm({ ...visitorForm, flat: e.target.value })} />
-              <Select value={visitorForm.purpose} onChange={(e) => setVisitorForm({ ...visitorForm, purpose: e.target.value })}>
-                <option value="Guest">Guest</option>
-                <option value="Delivery">Delivery</option>
-                <option value="HouseHelp">HouseHelp</option>
-                <option value="Home Service">Home Service</option>
-              </Select>
-              <Button busy={savingVisitor} busyText="Adding…">Pre-approve visitor</Button>
-            </form>
+            {myFlat ? (
+              <form onSubmit={preApproveVisitor} className="grid gap-2">
+                <p className="text-xs text-zinc-500">Visiting flat <span className="font-medium text-zinc-700 dark:text-zinc-300">{myFlat}</span></p>
+                <Input required placeholder="Visitor name" value={visitorForm.name} onChange={(e) => setVisitorForm({ ...visitorForm, name: e.target.value })} />
+                <Select value={visitorForm.purpose} onChange={(e) => setVisitorForm({ ...visitorForm, purpose: e.target.value })}>
+                  <option value="Guest">Guest</option>
+                  <option value="Delivery">Delivery</option>
+                  <option value="HouseHelp">HouseHelp</option>
+                  <option value="Home Service">Home Service</option>
+                </Select>
+                <Button busy={savingVisitor} busyText="Adding…">Pre-approve visitor</Button>
+              </form>
+            ) : (
+              <p className="text-sm text-zinc-500">
+                Your account isn&apos;t linked to a flat yet — ask your society admin, or set it yourself under My info.
+              </p>
+            )}
           </Card>
           <div className="mt-3 grid gap-2">
             {visitors.length === 0 ? <p className="text-sm text-zinc-500">No visitors logged.</p> : visitors.map((v) => (
@@ -257,6 +301,22 @@ export default function ResidentApp() {
           </div>
         </div>
       </div>
+
+      {confirmingSos ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-rose-950/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl dark:bg-zinc-900">
+            <p className="text-xs font-semibold uppercase tracking-wide text-rose-600">Confirm SOS</p>
+            <p className="mt-2 text-xl font-semibold">Raise the alarm?</p>
+            <p className="mt-1 text-sm text-zinc-500">
+              This immediately alerts the guard and office-holders for flat <span className="font-medium text-zinc-700 dark:text-zinc-300">{myFlat ?? sosFlat}</span>.
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <Button variant="secondary" onClick={() => setConfirmingSos(false)} disabled={raisingSos}>Cancel</Button>
+              <Button variant="danger" busy={raisingSos} busyText="Raising…" onClick={confirmSos}>Yes, raise SOS</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

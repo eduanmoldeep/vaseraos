@@ -21,6 +21,7 @@ export default function ResidentsPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingOfficeKey, setSavingOfficeKey] = useState<string | null>(null);
+  const [savingOwnerId, setSavingOwnerId] = useState<string | null>(null);
 
   const load = (id: string | null = society) => {
     if (!id) { setRows([]); setOffices({}); setLoading(false); return; }
@@ -79,6 +80,23 @@ export default function ResidentsPage() {
     }
   }
 
+  async function toggleOwnerTenant(r: Resident) {
+    const next = r.owner_tenant === "owner" ? "tenant" : "owner";
+    setSavingOwnerId(r.id);
+    try {
+      await fetch("/api/residents", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: r.id, owner_tenant: next }),
+      });
+      setRows((prev) => prev.map((row) => (row.id === r.id ? { ...row, owner_tenant: next } : row)));
+    } catch {
+      setError("Couldn't update owner/tenant. Try again.");
+    } finally {
+      setSavingOwnerId(null);
+    }
+  }
+
   async function remove(id: string) {
     if (!confirm("Remove this resident?")) return;
     await fetch(`/api/residents?id=${id}`, { method: "DELETE" });
@@ -124,7 +142,14 @@ export default function ResidentsPage() {
                 <p className="text-xs text-zinc-500">{r.phone} · {r.members} members{r.email ? ` · ${r.email}` : ""}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge tone={r.owner_tenant === "owner" ? "blue" : "amber"}>{r.owner_tenant === "owner" ? "Flat owner" : "Tenant"}</Badge>
+                <button
+                  disabled={savingOwnerId === r.id}
+                  onClick={() => toggleOwnerTenant(r)}
+                  className="disabled:opacity-50"
+                  aria-label={`Change ${r.name} to ${r.owner_tenant === "owner" ? "tenant" : "flat owner"}`}
+                >
+                  <Badge tone={r.owner_tenant === "owner" ? "blue" : "amber"}>{r.owner_tenant === "owner" ? "Flat owner" : "Tenant"}</Badge>
+                </button>
                 {r.user_id ? (
                   OFFICES.map((o) => {
                     const active = (offices[r.user_id!] ?? []).includes(o.value);

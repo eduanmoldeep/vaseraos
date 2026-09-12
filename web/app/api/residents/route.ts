@@ -47,6 +47,33 @@ export async function POST(req: Request) {
   return NextResponse.json(resident, { status: 201 });
 }
 
+/** Admin-only: change a resident's owner/tenant status after the fact. */
+export async function PATCH(req: Request) {
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  const id = String(body.id ?? "");
+  if (!id) return NextResponse.json({ error: "Provide id." }, { status: 400 });
+  const owner_tenant = body.owner_tenant === "owner" ? "owner" : body.owner_tenant === "tenant" ? "tenant" : null;
+  if (!owner_tenant) return NextResponse.json({ error: "Provide owner_tenant: owner | tenant" }, { status: 400 });
+
+  const env = await getEnv();
+  if (env?.DB) {
+    const row = await env.DB.prepare("SELECT society_id FROM residents WHERE id = ?").bind(id).first<{ society_id: string }>();
+    if (!row) return NextResponse.json({ error: "Resident not found" }, { status: 404 });
+    const denied = await requireSocietyAdmin(row.society_id);
+    if (denied) return denied;
+    await env.DB.prepare("UPDATE residents SET owner_tenant = ? WHERE id = ?").bind(owner_tenant, id).run();
+    const updated = await env.DB.prepare("SELECT * FROM residents WHERE id = ?").bind(id).first();
+    return NextResponse.json(updated);
+  }
+  const resident = mockStore().residents.find((r) => r.id === id);
+  if (!resident) return NextResponse.json({ error: "Resident not found" }, { status: 404 });
+  const denied = await requireSocietyAdmin(resident.society_id);
+  if (denied) return denied;
+  resident.owner_tenant = owner_tenant;
+  return NextResponse.json(resident);
+}
+
 export async function DELETE(req: Request) {
   const id = new URL(req.url).searchParams.get("id") ?? "";
   if (!id) return NextResponse.json({ error: "Provide ?id=" }, { status: 400 });
