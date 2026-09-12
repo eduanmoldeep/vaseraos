@@ -1,3 +1,5 @@
 # Local-only secrets for `wrangler dev` / `next dev`. Never commit real values.
 # Copy to `.dev.vars` and fill in for local development.
 # SESSION_SECRET=change-me-locally
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=

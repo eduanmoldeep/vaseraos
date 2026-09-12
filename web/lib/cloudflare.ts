@@ -65,6 +65,7 @@ export type Resident = {
   members: number;
   owner_tenant: "owner" | "tenant";
   society_id: string;
+  user_id?: string | null;
 };
 
 export type Bill = {
@@ -74,6 +75,30 @@ export type Bill = {
   month: string;
   status: "pending" | "paid" | "overdue";
   society_id: string;
+  receipt_key?: string | null;
+  paid_at?: string | null;
+};
+
+export type Notification = {
+  id: string;
+  user_id: string;
+  society_id: string;
+  title: string;
+  body?: string | null;
+  read_at?: string | null;
+  created_at: string;
+};
+
+export type Expense = {
+  id: string;
+  society_id: string;
+  category: string;
+  vendor: string;
+  amount: number;
+  description?: string | null;
+  receipt_key?: string | null;
+  created_by?: string | null;
+  created_at: string;
 };
 
 /** How often dues are raised. Bills carry the current period's label in `Bill.month` — "2026-09", "2026-Q3" or "2026". */
@@ -147,6 +172,8 @@ const g = globalThis as unknown as {
     auditLog: AuditEntry[];
     residents: Resident[];
     bills: Bill[];
+    expenses: Expense[];
+    notifications: Notification[];
     maintenanceSettings: MaintenanceSetting[];
     complaints: Complaint[];
     visitors: Visitor[];
@@ -178,6 +205,8 @@ export function mockStore() {
         { id: "b2", flat: "B-204", amount: 4500, month: "2026-09", status: "pending", society_id: "s_default" },
         { id: "b3", flat: "C-303", amount: 5200, month: "2026-09", status: "overdue", society_id: "s2" },
       ],
+      expenses: [],
+      notifications: [],
       complaints: [
         { id: "c1", flat: "B-204", title: "Lift not working in Block B", category: "maintenance", status: "in_progress", society_id: "s_default" },
         { id: "c2", flat: "A-101", title: "Water leakage in parking", category: "plumbing", status: "open", society_id: "s_default" },

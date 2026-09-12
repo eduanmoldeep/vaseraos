@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getEnv, mockStore, uid, DEFAULT_SOCIETY_ID, type Complaint } from "@/lib/cloudflare";
-import { requireSocietyAdmin, requireSocietyMember } from "@/lib/auth";
+import { getViewer, requireSocietyAdmin, requireSocietyMember } from "@/lib/auth";
+import { getMyFlat, getOffices } from "@/lib/membership";
 
 export const runtime = "nodejs";
 
@@ -25,9 +26,26 @@ export async function POST(req: Request) {
   // Any member can raise a ticket — residents raise their own, admins raise on a resident's behalf.
   const denied = await requireSocietyMember(society_id);
   if (denied) return denied;
+
+  const viewer = (await getViewer())!; // requireSocietyMember already confirmed a logged-in viewer
+  const isAdminish = viewer.admin || (await getOffices(viewer.id, society_id)).length > 0;
+  let flat: string;
+  if (isAdminish && body.flat) {
+    flat = String(body.flat);
+  } else {
+    const myFlat = await getMyFlat(viewer.id, viewer.email, society_id);
+    if (!myFlat) {
+      return NextResponse.json(
+        { error: "Your account isn't linked to a flat yet — ask your society admin to add you as a resident with this email." },
+        { status: 400 }
+      );
+    }
+    flat = myFlat;
+  }
+
   const complaint = {
     id: uid("c"),
-    flat: String(body.flat ?? "A-101"),
+    flat,
     title: String(body.title ?? "New complaint"),
     category: String(body.category ?? "general"),
     status: (["open", "in_progress", "resolved"].includes(body.status) ? body.status : "open") as "open" | "in_progress" | "resolved",

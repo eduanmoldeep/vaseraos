@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getEnv, mockStore, uid, DEFAULT_SOCIETY_ID, type Bill } from "@/lib/cloudflare";
-import { requireSocietyAdmin } from "@/lib/auth";
+import { requireSocietyAdmin, requireSocietyOffice } from "@/lib/auth";
 import { ensureMaintenanceDue } from "@/lib/maintenance";
+import { storeReceipt } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 
@@ -24,7 +25,8 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   const society_id = String(body.society_id ?? body.society ?? DEFAULT_SOCIETY_ID);
-  const denied = await requireSocietyAdmin(society_id);
+  // Raising a bill is the treasurer's call — same office that owns the dues config.
+  const denied = await requireSocietyOffice(society_id, "treasurer");
   if (denied) return denied;
   const bill = {
     id: uid("b"),
@@ -47,21 +49,42 @@ export async function POST(req: Request) {
 
 const BILL_STATUSES = ["pending", "paid", "overdue"] as const;
 
+/** Accepts JSON ({id, status}) or multipart/form-data (same fields, plus an optional `receipt` file — for marking a bill paid with a payment proof). */
 export async function PATCH(req: Request) {
-  const body = await req.json().catch(() => null);
-  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  const id = String(body.id ?? "");
-  const status = String(body.status ?? "");
+  const isMultipart = (req.headers.get("content-type") ?? "").includes("multipart/form-data");
+  let id: string, status: string, receiptFile: File | null = null;
+  if (isMultipart) {
+    const form = await req.formData().catch(() => null);
+    if (!form) return NextResponse.json({ error: "Invalid form data." }, { status: 400 });
+    id = String(form.get("id") ?? "");
+    status = String(form.get("status") ?? "");
+    receiptFile = form.get("receipt") as File | null;
+  } else {
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    id = String(body.id ?? "");
+    status = String(body.status ?? "");
+  }
   if (!id || !BILL_STATUSES.includes(status as (typeof BILL_STATUSES)[number])) {
     return NextResponse.json({ error: "Provide id and valid status: pending | paid | overdue" }, { status: 400 });
   }
+
   const env = await getEnv();
   if (env?.DB) {
     const row = await env.DB.prepare("SELECT society_id FROM maintenance_bills WHERE id = ?").bind(id).first<{ society_id: string }>();
     if (!row) return NextResponse.json({ error: "Bill not found" }, { status: 404 });
     const denied = await requireSocietyAdmin(row.society_id);
     if (denied) return denied;
-    await env.DB.prepare("UPDATE maintenance_bills SET status = ? WHERE id = ?").bind(status, id).run();
+    let receipt_key: string | undefined;
+    try {
+      receipt_key = await storeReceipt(row.society_id, receiptFile);
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : "Couldn't store receipt." }, { status: 400 });
+    }
+    const paid_at = status === "paid" ? new Date().toISOString() : null;
+    await env.DB.prepare("UPDATE maintenance_bills SET status = ?, paid_at = ?, receipt_key = COALESCE(?, receipt_key) WHERE id = ?")
+      .bind(status, paid_at, receipt_key ?? null, id)
+      .run();
     const updated = await env.DB.prepare("SELECT * FROM maintenance_bills WHERE id = ?").bind(id).first();
     return NextResponse.json(updated);
   }
@@ -70,6 +93,7 @@ export async function PATCH(req: Request) {
   const denied = await requireSocietyAdmin(bill.society_id);
   if (denied) return denied;
   bill.status = status as Bill["status"];
+  bill.paid_at = status === "paid" ? new Date().toISOString() : null;
   return NextResponse.json(bill);
 }
 

@@ -4,7 +4,8 @@ import { getSocietiesWithAnyOffice } from "@/lib/membership";
 import { AdminSidebar } from "@/components/AdminSidebar";
 import { AdminNav } from "@/components/AdminNav";
 import { SocietySwitcher } from "@/components/SocietySwitcher";
-import { LogoutButton } from "@/components/LogoutButton";
+import { NotificationBell } from "@/components/NotificationBell";
+import { UserMenu } from "@/components/UserMenu";
 import { SosWatcher } from "@/components/SosWatcher";
 
 /**
@@ -29,10 +30,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95 md:hidden">
           <div className="flex items-center justify-between gap-3">
             <SocietySwitcher compact />
-            <LogoutButton />
+            <div className="flex items-center gap-1">
+              <NotificationBell />
+              <UserMenu />
+            </div>
           </div>
           <div className="mt-3">
             <AdminNav />
+          </div>
+        </header>
+        <header className="sticky top-0 z-10 hidden justify-end border-b border-zinc-200 bg-white/95 px-4 py-2.5 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95 md:flex sm:px-6 lg:px-8">
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <UserMenu />
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-8">{children}</main>

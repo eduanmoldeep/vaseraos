@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, Empty, ErrorBanner, Input, PageHeader, Select } from "@/components/ui";
-import { LogoutButton } from "@/components/LogoutButton";
+import { NotificationBell } from "@/components/NotificationBell";
+import { UserMenu } from "@/components/UserMenu";
 import type { AuthUser } from "@/lib/cloudflare";
+import { setSelectedSociety } from "@/lib/society";
 
 type Membership = { societyId: string; name: string; status: string; offices: string[] };
 type Summary = { residents: number; dues: number; openComplaints: number; activeVisitors: number };
@@ -24,7 +26,8 @@ export default function ResidentApp() {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [error, setError] = useState("");
-  const [complaintForm, setComplaintForm] = useState({ flat: "", title: "", category: "general" });
+  const [myFlat, setMyFlat] = useState<string | null>(null);
+  const [complaintForm, setComplaintForm] = useState({ title: "", category: "general" });
   const [visitorForm, setVisitorForm] = useState({ name: "", flat: "", purpose: "Guest" });
   const [savingComplaint, setSavingComplaint] = useState(false);
   const [savingVisitor, setSavingVisitor] = useState(false);
@@ -48,6 +51,7 @@ export default function ResidentApp() {
             if (residentRows.length === 0) { router.replace("/"); return; }
             setMemberships(residentRows);
             setActiveId(residentRows[0].societyId);
+            setSelectedSociety(residentRows[0].societyId);
           })
           .catch(() => setError("Couldn't load your societies."));
       })
@@ -60,6 +64,7 @@ export default function ResidentApp() {
     fetch(`/api/notices?society=${id}`).then((r) => r.json()).then(setNotices).catch(() => {});
     fetch(`/api/complaints?society=${id}`).then((r) => r.json()).then(setComplaints).catch(() => {});
     fetch(`/api/visitors?society=${id}`).then((r) => r.json()).then(setVisitors).catch(() => {});
+    fetch(`/api/me/flat?society=${id}`).then((r) => r.json()).then((d) => setMyFlat(d?.flat ?? null)).catch(() => {});
     fetch(`/api/sos?society=${id}`)
       .then((r) => r.json())
       .then((rows: SosAlert[]) => setSosAlert(rows.find((s) => s.raised_by_user_id === viewer?.id) ?? null))
@@ -107,7 +112,7 @@ export default function ResidentApp() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...complaintForm, society_id: activeId }),
       });
-      setComplaintForm({ flat: "", title: "", category: "general" });
+      setComplaintForm({ title: "", category: "general" });
       loadSociety(activeId);
     } finally {
       setSavingComplaint(false);
@@ -150,7 +155,11 @@ export default function ResidentApp() {
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">My society</p>
           {memberships.length > 1 ? (
-            <Select value={activeId ?? ""} onChange={(e) => setActiveId(e.target.value)} className="mt-1 w-auto text-lg font-semibold">
+            <Select
+              value={activeId ?? ""}
+              onChange={(e) => { setActiveId(e.target.value); setSelectedSociety(e.target.value); }}
+              className="mt-1 w-auto text-lg font-semibold"
+            >
               {memberships.map((m) => (
                 <option key={m.societyId} value={m.societyId}>{m.name}</option>
               ))}
@@ -159,7 +168,10 @@ export default function ResidentApp() {
             <h1 className="text-2xl font-semibold tracking-tight">{active?.name}</h1>
           )}
         </div>
-        <LogoutButton />
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <UserMenu />
+        </div>
       </div>
 
       {error ? <div className="mb-4"><ErrorBanner text={error} /></div> : null}
@@ -215,18 +227,24 @@ export default function ResidentApp() {
         <div>
           <PageHeader title="Complaints" />
           <Card>
-            <form onSubmit={raiseComplaint} className="grid gap-2">
-              <Input required placeholder="Your flat" value={complaintForm.flat} onChange={(e) => setComplaintForm({ ...complaintForm, flat: e.target.value })} />
-              <Input required placeholder="What's the issue?" value={complaintForm.title} onChange={(e) => setComplaintForm({ ...complaintForm, title: e.target.value })} />
-              <Select value={complaintForm.category} onChange={(e) => setComplaintForm({ ...complaintForm, category: e.target.value })}>
-                <option value="general">General</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="plumbing">Plumbing</option>
-                <option value="electrical">Electrical</option>
-                <option value="security">Security</option>
-              </Select>
-              <Button busy={savingComplaint} busyText="Raising…">Raise complaint</Button>
-            </form>
+            {myFlat ? (
+              <form onSubmit={raiseComplaint} className="grid gap-2">
+                <p className="text-xs text-zinc-500">Raising for flat <span className="font-medium text-zinc-700 dark:text-zinc-300">{myFlat}</span></p>
+                <Input required placeholder="What's the issue?" value={complaintForm.title} onChange={(e) => setComplaintForm({ ...complaintForm, title: e.target.value })} />
+                <Select value={complaintForm.category} onChange={(e) => setComplaintForm({ ...complaintForm, category: e.target.value })}>
+                  <option value="general">General</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="plumbing">Plumbing</option>
+                  <option value="electrical">Electrical</option>
+                  <option value="security">Security</option>
+                </Select>
+                <Button busy={savingComplaint} busyText="Raising…">Raise complaint</Button>
+              </form>
+            ) : (
+              <p className="text-sm text-zinc-500">
+                Your account isn&apos;t linked to a flat yet — ask your society admin to add you as a resident using this account&apos;s email.
+              </p>
+            )}
           </Card>
           <div className="mt-3 grid gap-2">
             {complaints.length === 0 ? <p className="text-sm text-zinc-500">No complaints yet.</p> : complaints.map((c) => (

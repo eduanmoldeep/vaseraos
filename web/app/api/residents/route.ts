@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     phone: String(body.phone ?? ""),
     email: body.email ? String(body.email) : undefined,
     members: Number(body.members ?? 1),
-    owner_tenant: (body.owner_tenant === "tenant" ? "tenant" : "owner") as "owner" | "tenant",
+    owner_tenant: (body.owner_tenant === "owner" ? "owner" : "tenant") as "owner" | "tenant",
     society_id,
   };
   const env = await getEnv();

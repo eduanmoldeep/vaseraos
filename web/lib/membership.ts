@@ -25,6 +25,32 @@ export async function isMember(userId: string, societyId: string): Promise<boole
   return (await getMemberships(userId)).some((m) => m.societyId === societyId);
 }
 
+/**
+ * The flat this user occupies in a society, or null if unlinked. Matches by
+ * user_id first; falls back to matching the resident row's email (opportunistically
+ * linking it) so residents added by an admin before signup still resolve.
+ */
+export async function getMyFlat(userId: string, userEmail: string, societyId: string): Promise<string | null> {
+  const env = await getEnv();
+  const conn = await db(env);
+  if (conn) {
+    const byId = await conn.prepare("SELECT flat FROM residents WHERE society_id = ? AND user_id = ?")
+      .bind(societyId, userId).first<{ flat: string }>();
+    if (byId) return byId.flat;
+    const byEmail = await conn.prepare("SELECT id, flat FROM residents WHERE society_id = ? AND email = ?")
+      .bind(societyId, userEmail.toLowerCase()).first<{ id: string; flat: string }>();
+    if (byEmail) {
+      await conn.prepare("UPDATE residents SET user_id = ? WHERE id = ?").bind(userId, byEmail.id).run();
+      return byEmail.flat;
+    }
+    return null;
+  }
+  const store = mockStore();
+  const resident = store.residents.find((r) => r.society_id === societyId && r.user_id === userId)
+    ?? store.residents.find((r) => r.society_id === societyId && r.email?.toLowerCase() === userEmail.toLowerCase());
+  return resident?.flat ?? null;
+}
+
 /** Records that a user belongs to a society. Idempotent — joining twice is a no-op. */
 export async function addMembership(userId: string, societyId: string): Promise<void> {
   const env = await getEnv();

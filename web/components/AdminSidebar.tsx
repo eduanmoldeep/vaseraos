@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { ADMIN_NAV } from "@/lib/adminNav";
 import { useIsPlatformAdmin } from "@/lib/useViewer";
 import { SocietySwitcher } from "@/components/SocietySwitcher";
-import { LogoutButton } from "@/components/LogoutButton";
 
 /** Desktop shell: society (not brand) is the identity up top; VaseraOS is a quiet footer credit. */
 export function AdminSidebar() {
@@ -40,8 +39,7 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <div className="space-y-3 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
-        <LogoutButton className="w-full" />
+      <div className="border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
         <Link href="/admin/about" className="block text-xs text-zinc-400 hover:text-zinc-600 dark:text-zinc-600 dark:hover:text-zinc-400">
           VaseraOS
         </Link>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader, Select } from "@/components/ui";
 import { NeedsSociety } from "@/components/NeedsSociety";
 import type { Resident } from "@/lib/cloudflare";
 import { getSelectedSociety } from "@/lib/society";
@@ -9,7 +9,7 @@ import { getSelectedSociety } from "@/lib/society";
 export default function ResidentsPage() {
   const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
   const [rows, setRows] = useState<Resident[]>([]);
-  const [form, setForm] = useState({ name: "", flat: "", phone: "" });
+  const [form, setForm] = useState({ name: "", flat: "", phone: "", owner_tenant: "tenant" as "owner" | "tenant" });
   const [loading, setLoading] = useState(() => !!getSelectedSociety());
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -47,7 +47,7 @@ export default function ResidentsPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...form, society_id: getSelectedSociety() }),
       });
-      setForm({ name: "", flat: "", phone: "" });
+      setForm({ name: "", flat: "", phone: "", owner_tenant: "tenant" });
       load();
     } catch {
       setError("Couldn't add resident. Try again.");
@@ -79,6 +79,10 @@ export default function ResidentsPage() {
           <Input required placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <Input required placeholder="Flat (e.g. A-101)" value={form.flat} onChange={(e) => setForm({ ...form, flat: e.target.value })} />
           <Input required placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Select value={form.owner_tenant} onChange={(e) => setForm({ ...form, owner_tenant: e.target.value as "owner" | "tenant" })}>
+            <option value="tenant">Tenant</option>
+            <option value="owner">Flat owner</option>
+          </Select>
           <Button busy={saving} busyText="Adding…">Add resident</Button>
         </form>
       </Card>
@@ -96,7 +100,7 @@ export default function ResidentsPage() {
                 <p className="text-xs text-zinc-500">{r.phone} · {r.members} members</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone={r.owner_tenant === "owner" ? "blue" : "amber"}>{r.owner_tenant}</Badge>
+                <Badge tone={r.owner_tenant === "owner" ? "blue" : "amber"}>{r.owner_tenant === "owner" ? "Flat owner" : "Tenant"}</Badge>
                 <Button variant="danger" size="sm" onClick={() => remove(r.id)} aria-label={`Remove resident ${r.name}`}>
                   Delete
                 </Button>

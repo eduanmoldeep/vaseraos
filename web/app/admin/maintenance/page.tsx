@@ -19,6 +19,7 @@ export default function MaintenancePage() {
   const [loading, setLoading] = useState(() => !!getSelectedSociety());
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [receiptFiles, setReceiptFiles] = useState<Record<string, File | null>>({});
 
   const loadSetting = (id: string | null) => {
     if (!id) { setSetting(null); return; }
@@ -91,12 +92,15 @@ export default function MaintenancePage() {
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError("");
     try {
-      await fetch("/api/bills", {
+      const res = await fetch("/api/bills", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...form, amount: Number(form.amount), society_id: getSelectedSociety() }),
       });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { setError(data?.error ?? "Couldn't raise bill."); return; }
       setForm({ flat: "", amount: "", month: "2026-09" });
       load();
     } catch {
@@ -112,6 +116,17 @@ export default function MaintenancePage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id, status }),
     });
+    load();
+  }
+
+  async function markPaid(id: string) {
+    const fd = new FormData();
+    fd.set("id", id);
+    fd.set("status", "paid");
+    const file = receiptFiles[id];
+    if (file) fd.set("receipt", file);
+    await fetch("/api/bills", { method: "PATCH", body: fd });
+    setReceiptFiles((r) => ({ ...r, [id]: null }));
     load();
   }
 
@@ -156,7 +171,8 @@ export default function MaintenancePage() {
       </Card>
 
       <Card className="mt-4">
-        <form onSubmit={add} className="grid gap-3 sm:grid-cols-4">
+        <p className="text-sm font-medium">One-off bill (treasurer)</p>
+        <form onSubmit={add} className="mt-3 grid gap-3 sm:grid-cols-4">
           <Input required placeholder="Flat" value={form.flat} onChange={(e) => setForm({ ...form, flat: e.target.value })} />
           <Input required type="number" min="0" placeholder="Amount ₹" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           <Input required type="month" value={form.month} onChange={(e) => setForm({ ...form, month: e.target.value })} />
@@ -178,16 +194,45 @@ export default function MaintenancePage() {
               </div>
               <div className="flex items-center gap-2">
                 <Badge tone={b.status === "paid" ? "green" : b.status === "overdue" ? "red" : "amber"}>{b.status}</Badge>
-                <Select
-                  value={b.status}
-                  onChange={(e) => setStatus(b.id, e.target.value)}
-                  className="w-auto px-2 py-1 text-xs"
-                  aria-label={`Bill status for ${b.flat} ${b.month}`}
-                >
-                  <option value="pending">pending</option>
-                  <option value="paid">paid</option>
-                  <option value="overdue">overdue</option>
-                </Select>
+                {b.status === "paid" ? (
+                  <>
+                    <Select
+                      value={b.status}
+                      onChange={(e) => setStatus(b.id, e.target.value)}
+                      className="w-auto px-2 py-1 text-xs"
+                      aria-label={`Bill status for ${b.flat} ${b.month}`}
+                    >
+                      <option value="pending">pending</option>
+                      <option value="paid">paid</option>
+                      <option value="overdue">overdue</option>
+                    </Select>
+                    {b.receipt_key ? (
+                      <a href={`/api/uploads/${b.receipt_key}`} target="_blank" rel="noreferrer" className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                        Receipt
+                      </a>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <Select
+                      value={b.status}
+                      onChange={(e) => setStatus(b.id, e.target.value)}
+                      className="w-auto px-2 py-1 text-xs"
+                      aria-label={`Bill status for ${b.flat} ${b.month}`}
+                    >
+                      <option value="pending">pending</option>
+                      <option value="overdue">overdue</option>
+                    </Select>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      aria-label={`Payment receipt for ${b.flat} ${b.month}`}
+                      onChange={(e) => setReceiptFiles((r) => ({ ...r, [b.id]: e.target.files?.[0] ?? null }))}
+                      className="w-32 text-xs text-zinc-500 file:mr-1 file:rounded file:border-0 file:bg-zinc-100 file:px-1.5 file:py-0.5 file:text-xs dark:file:bg-zinc-800"
+                    />
+                    <Button size="sm" onClick={() => markPaid(b.id)}>Mark paid</Button>
+                  </>
+                )}
                 <Button variant="danger" size="sm" onClick={() => remove(b.id)} aria-label={`Delete bill for ${b.flat} ${b.month}`}>
                   Delete
                 </Button>

@@ -82,6 +82,53 @@ export async function verifyLogin(email: string, password: string): Promise<{ us
   return { user: { id: found.id, name: found.name, email: found.email, admin: found.admin } };
 }
 
+/**
+ * Finds the account for a verified Google identity, linking it to an existing
+ * email match or creating a new (non-admin) account. password_hash is set to
+ * a random unusable value — Google-only accounts never log in via password.
+ */
+export async function findOrCreateGoogleUser(googleId: string, email: string, name: string): Promise<AuthUser> {
+  const cleanEmail = email.trim().toLowerCase();
+  const env = await getEnv();
+  if (env?.DB) {
+    const byGoogleId = await env.DB.prepare("SELECT id, name, email, admin FROM users WHERE google_id = ?")
+      .bind(googleId)
+      .first<AuthUser & { admin: number }>();
+    if (byGoogleId) return { id: byGoogleId.id, name: byGoogleId.name, email: byGoogleId.email, admin: byGoogleId.admin === 1 };
+
+    const byEmail = await findByEmail(env, cleanEmail);
+    if (byEmail) {
+      await env.DB.prepare("UPDATE users SET google_id = ? WHERE id = ?").bind(googleId, byEmail.id).run();
+      return { id: byEmail.id, name: byEmail.name, email: byEmail.email, admin: byEmail.admin };
+    }
+
+    const user: StoredUser = {
+      id: uid("u"),
+      name: name.trim() || cleanEmail,
+      email: cleanEmail,
+      password_hash: hashPassword(randomBytes(32).toString("hex")),
+      admin: false,
+    };
+    await env.DB.prepare("INSERT INTO users (id, name, email, password_hash, admin, google_id) VALUES (?, ?, ?, ?, 0, ?)")
+      .bind(user.id, user.name, user.email, user.password_hash, googleId)
+      .run();
+    return { id: user.id, name: user.name, email: user.email, admin: false };
+  }
+
+  // Local dev fallback: in-memory only, no google_id tracking (single-process).
+  const byEmail = localUsers().find((u) => u.email === cleanEmail);
+  if (byEmail) return { id: byEmail.id, name: byEmail.name, email: byEmail.email, admin: byEmail.admin };
+  const user: StoredUser = {
+    id: uid("u"),
+    name: name.trim() || cleanEmail,
+    email: cleanEmail,
+    password_hash: hashPassword(randomBytes(32).toString("hex")),
+    admin: false,
+  };
+  localUsers().push(user);
+  return { id: user.id, name: user.name, email: user.email, admin: false };
+}
+
 /** All accounts, newest first — for the admin user list. Never exposes password hashes. */
 export async function listUsers(): Promise<(AuthUser & { createdAt: string })[]> {
   const env = await getEnv();

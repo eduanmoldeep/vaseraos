@@ -13,6 +13,7 @@ const MODULES = [
   { href: "/admin/societies", title: "Societies", desc: "Admin: tenants & switching", dot: "bg-teal-500" },
   { href: "/admin/residents", title: "Residents", desc: "Flats, owners, tenants & members", dot: "bg-sky-500" },
   { href: "/admin/maintenance", title: "Maintenance", desc: "Bills, dues & collection", dot: "bg-amber-500" },
+  { href: "/admin/ledger", title: "Ledger", desc: "Income, expenses & running balance", dot: "bg-indigo-500" },
   { href: "/admin/complaints", title: "Complaints", desc: "Tickets & resolution status", dot: "bg-rose-500" },
   { href: "/admin/visitors", title: "Visitors", desc: "Gate entries & check-ins", dot: "bg-violet-500" },
   { href: "/admin/notices", title: "Notices", desc: "Announcements with attachments", dot: "bg-emerald-500" },

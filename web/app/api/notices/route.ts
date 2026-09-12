@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { DEFAULT_SOCIETY_ID, getEnv, mockStore, uid } from "@/lib/cloudflare";
-import { requireSocietyAdmin, requireSocietyMember, requireSocietyOffice } from "@/lib/auth";
+import { getViewer, requireSocietyAdmin, requireSocietyMember, requireSocietyOffice } from "@/lib/auth";
+import { notifySociety } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 
@@ -40,6 +41,8 @@ export async function POST(req: Request) {
   } else {
     mockStore().notices.push(notice);
   }
+  const viewer = await getViewer();
+  await notifySociety(society_id, `New notice: ${notice.title}`, notice.body.slice(0, 140), viewer?.id);
   return NextResponse.json(notice, { status: 201 });
 }
 
