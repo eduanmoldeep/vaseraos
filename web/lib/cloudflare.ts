@@ -113,6 +113,32 @@ export type Notice = {
   society_id: string;
 };
 
+/** A guard is not a resident and never holds a society office — a fully separate identity, authenticated by bearer token (mobile-friendly) rather than the session cookie. */
+export type Guard = {
+  id: string;
+  society_id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  active: boolean;
+};
+
+export type GuardPlatform = "android" | "ios";
+export type GuardPushToken = { id: string; guard_id: string; platform: GuardPlatform; expo_token?: string | null; voip_token?: string | null };
+
+export type SosStatus = "open" | "acknowledged" | "resolved";
+export type SosAlert = {
+  id: string;
+  society_id: string;
+  raised_by_user_id: string;
+  flat: string;
+  status: SosStatus;
+  acknowledged_by_guard_id?: string | null;
+  created_at: string;
+  acknowledged_at?: string | null;
+  resolved_at?: string | null;
+};
+
 const g = globalThis as unknown as {
   __vasera?: {
     societies: Society[];
@@ -125,6 +151,9 @@ const g = globalThis as unknown as {
     complaints: Complaint[];
     visitors: Visitor[];
     notices: Notice[];
+    guards: (Guard & { password_hash: string })[];
+    guardPushTokens: GuardPushToken[];
+    sosAlerts: SosAlert[];
   };
 };
 
@@ -161,6 +190,9 @@ export function mockStore() {
         { id: "n1", title: "AGM on 20th Sept", body: "Annual General Body Meeting at clubhouse, 10 AM. All residents requested to attend.", audience: "all", society_id: "s_default" },
         { id: "n2", title: "Water tank cleaning", body: "Tank cleaning on Sunday 6 AM – 10 AM. Please store water accordingly.", audience: "all", society_id: "s_default" },
       ],
+      guards: [],
+      guardPushTokens: [],
+      sosAlerts: [],
     };
   }
   return g.__vasera;

@@ -67,6 +67,11 @@ function describe(action: string): string {
     case "membership.join": return "joined a society";
     case "society.register": return "registered a society";
     case "maintenance.settings.update": return "updated maintenance settings for";
+    case "guard.create": return "added a guard to";
+    case "guard.deactivate": return "deactivated a guard in";
+    case "sos.raise": return "raised an SOS alarm in";
+    case "sos.acknowledge": return "acknowledged an SOS alarm in";
+    case "sos.resolve": return "resolved an SOS alarm in";
     default: return action;
   }
 }

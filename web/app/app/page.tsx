@@ -11,6 +11,7 @@ type Summary = { residents: number; dues: number; openComplaints: number; active
 type Notice = { id: string; title: string; body: string };
 type Complaint = { id: string; flat: string; title: string; category: string; status: string };
 type Visitor = { id: string; name: string; flat: string; purpose: string; status: string };
+type SosAlert = { id: string; flat: string; status: "open" | "acknowledged" | "resolved"; raised_by_user_id: string };
 
 export default function ResidentApp() {
   const router = useRouter();
@@ -27,6 +28,9 @@ export default function ResidentApp() {
   const [visitorForm, setVisitorForm] = useState({ name: "", flat: "", purpose: "Guest" });
   const [savingComplaint, setSavingComplaint] = useState(false);
   const [savingVisitor, setSavingVisitor] = useState(false);
+  const [sosFlat, setSosFlat] = useState("");
+  const [sosAlert, setSosAlert] = useState<SosAlert | null>(null);
+  const [raisingSos, setRaisingSos] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -56,10 +60,42 @@ export default function ResidentApp() {
     fetch(`/api/notices?society=${id}`).then((r) => r.json()).then(setNotices).catch(() => {});
     fetch(`/api/complaints?society=${id}`).then((r) => r.json()).then(setComplaints).catch(() => {});
     fetch(`/api/visitors?society=${id}`).then((r) => r.json()).then(setVisitors).catch(() => {});
+    fetch(`/api/sos?society=${id}`)
+      .then((r) => r.json())
+      .then((rows: SosAlert[]) => setSosAlert(rows.find((s) => s.raised_by_user_id === viewer?.id) ?? null))
+      .catch(() => {});
   };
   useEffect(() => {
     if (activeId) loadSociety(activeId);
   }, [activeId]);
+
+  useEffect(() => {
+    if (!activeId || !sosAlert || sosAlert.status === "resolved") return;
+    const id = setInterval(() => {
+      fetch(`/api/sos?society=${activeId}`)
+        .then((r) => r.json())
+        .then((rows: SosAlert[]) => setSosAlert(rows.find((s) => s.id === sosAlert.id) ?? null))
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(id);
+  }, [activeId, sosAlert]);
+
+  async function raiseSos(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeId) return;
+    setRaisingSos(true);
+    try {
+      const res = await fetch("/api/sos", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ society_id: activeId, flat: sosFlat }),
+      });
+      const data = await res.json();
+      setSosAlert(data);
+    } finally {
+      setRaisingSos(false);
+    }
+  }
 
   async function raiseComplaint(e: React.FormEvent) {
     e.preventDefault();
@@ -127,6 +163,26 @@ export default function ResidentApp() {
       </div>
 
       {error ? <div className="mb-4"><ErrorBanner text={error} /></div> : null}
+
+      <Card className={sosAlert && sosAlert.status !== "resolved" ? "mb-6 border-rose-300 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/40" : "mb-6"}>
+        {sosAlert && sosAlert.status !== "resolved" ? (
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="font-medium text-rose-700 dark:text-rose-300">
+                {sosAlert.status === "acknowledged" ? "Guard is on the way" : "SOS sent — waiting for guard"}
+              </p>
+              <p className="mt-1 text-sm text-zinc-500">Flat {sosAlert.flat}</p>
+            </div>
+            <Badge tone={sosAlert.status === "acknowledged" ? "green" : "amber"}>{sosAlert.status}</Badge>
+          </div>
+        ) : (
+          <form onSubmit={raiseSos} className="flex flex-wrap items-center gap-3">
+            <Input required placeholder="Your flat" value={sosFlat} onChange={(e) => setSosFlat(e.target.value)} className="max-w-[10rem]" />
+            <Button variant="danger" busy={raisingSos} busyText="Raising SOS…">🚨 Raise SOS</Button>
+            <p className="text-sm text-zinc-500">Alerts the society's guard and office-holders immediately.</p>
+          </form>
+        )}
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>

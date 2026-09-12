@@ -5,6 +5,7 @@ import { AdminSidebar } from "@/components/AdminSidebar";
 import { AdminNav } from "@/components/AdminNav";
 import { SocietySwitcher } from "@/components/SocietySwitcher";
 import { LogoutButton } from "@/components/LogoutButton";
+import { SosWatcher } from "@/components/SosWatcher";
 
 /**
  * Admin shell: platform admins get in always; everyone else needs to currently
@@ -22,6 +23,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex flex-1">
+      <SosWatcher />
       <AdminSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95 md:hidden">
