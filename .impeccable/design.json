@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-13T00:00:00.000Z",
+  "title": "Design System: VaseraOS",
+  "extensions": {
+    "colorMeta": {
+      "ink-zinc": { "role": "primary", "displayName": "Ink Zinc", "canonical": "#09090b", "tonalRamp": ["#09090b", "#18181b", "#27272a", "#3f3f46", "#52525b", "#71717a", "#a1a1aa", "#d4d4d8"] },
+      "ledger-indigo": { "role": "secondary", "displayName": "Ledger Indigo", "canonical": "#4f46e5", "tonalRamp": ["#312e81", "#3730a3", "#4338ca", "#4f46e5", "#6366f1", "#818cf8", "#a5b4fc", "#c7d2fe"] },
+      "warning-red": { "role": "tertiary", "displayName": "Warning Red", "canonical": "#dc2626", "tonalRamp": ["#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#ef4444", "#f87171", "#fca5a5", "#fecaca"] },
+      "surface-bg": { "role": "neutral", "displayName": "Paper White", "canonical": "#ffffff" },
+      "surface-bg-dark": { "role": "neutral", "displayName": "Near Black", "canonical": "#09090b" },
+      "neutral-border": { "role": "neutral", "displayName": "Zinc Border (light)", "canonical": "#e4e4e7" },
+      "neutral-border-dark": { "role": "neutral", "displayName": "Zinc Border (dark)", "canonical": "#27272a" },
+      "module-residents": { "role": "signature", "displayName": "Module Dot — Residents (Sky)", "canonical": "#0ea5e9" },
+      "module-maintenance": { "role": "signature", "displayName": "Module Dot — Maintenance (Amber)", "canonical": "#f59e0b" },
+      "module-complaints": { "role": "signature", "displayName": "Module Dot — Complaints (Rose)", "canonical": "#f43f5e" },
+      "module-visitors": { "role": "signature", "displayName": "Module Dot — Visitors (Violet)", "canonical": "#8b5cf6" },
+      "module-notices": { "role": "signature", "displayName": "Module Dot — Notices (Emerald)", "canonical": "#10b981" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Title", "purpose": "Page headers via PageHeader." },
+      "body": { "displayName": "Body", "purpose": "Default UI copy, labels, table cells." },
+      "label": { "displayName": "Label", "purpose": "Badges, uppercase micro-labels (e.g. SOS ALARM)." },
+      "mono": { "displayName": "Mono", "purpose": "Geist Mono, reserved for future monospaced alignment needs." }
+    },
+    "shadows": [
+      { "name": "floating-menu", "value": "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)", "purpose": "Dropdown/overlay panels, e.g. the account menu (shadow-lg)." },
+      { "name": "alarm-overlay", "value": "0 25px 50px -12px rgba(0,0,0,0.25)", "purpose": "SOS alarm modal card (shadow-2xl), paired with full-screen rose scrim + blur." }
+    ],
+    "motion": [
+      { "name": "default-transition", "value": "all 150ms ease", "purpose": "Generic `transition` class on buttons, menu items, focus rings." },
+      { "name": "spin", "value": "animate-spin", "purpose": "Button busy-state spinner." },
+      { "name": "pulse", "value": "animate-pulse", "purpose": "ListSkeleton loading placeholders." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Default action button, Ink Zinc fill, inverted in dark mode.",
+      "html": "<button class=\"ds-btn-primary\">Add resident</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; font-weight: 500; font-size: 0.875rem; padding: 10px 16px; background: #09090b; color: #fff; border: none; transition: opacity 0.15s; } .ds-btn-primary:hover { opacity: 0.9; } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Accent Button",
+      "kind": "button",
+      "refersTo": "button-accent",
+      "description": "Single emphasized action per view.",
+      "html": "<button class=\"ds-btn-accent\">Save changes</button>",
+      "css": ".ds-btn-accent { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; font-weight: 500; font-size: 0.875rem; padding: 10px 16px; background: #4f46e5; color: #fff; border: none; transition: background 0.15s; } .ds-btn-accent:hover { background: #6366f1; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive action, text-only until confirmed, canonical red (not rose).",
+      "html": "<button class=\"ds-btn-danger\">Delete</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; font-weight: 500; font-size: 0.875rem; padding: 10px 16px; background: transparent; color: #dc2626; border: none; transition: background 0.15s; } .ds-btn-danger:hover { background: #fef2f2; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Shared text field style used by Input/Textarea/Select.",
+      "html": "<input class=\"ds-input\" placeholder=\"Name\" />",
+      "css": ".ds-input { width: 100%; border-radius: 8px; border: 1px solid #d4d4d8; background: #fff; padding: 8px 12px; font-size: 0.875rem; color: #18181b; outline: none; transition: border-color 0.15s, box-shadow 0.15s; } .ds-input::placeholder { color: #a1a1aa; } .ds-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.2); } .ds-input:disabled { opacity: 0.6; cursor: not-allowed; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Bordered flat container, the base unit of every page.",
+      "html": "<div class=\"ds-card\">Card content</div>",
+      "css": ".ds-card { border-radius: 12px; border: 1px solid #e4e4e7; background: #fff; padding: 20px; color: #09090b; }"
+    },
+    {
+      "name": "Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Status pill, five tones (zinc/green/amber/red/blue).",
+      "html": "<span class=\"ds-badge ds-badge-red\">Open</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; border-radius: 9999px; padding: 2px 10px; font-size: 0.75rem; font-weight: 500; } .ds-badge-red { background: #fee2e2; color: #991b1b; } .ds-badge-zinc { background: #f4f4f5; color: #3f3f46; } .ds-badge-green { background: #dcfce7; color: #166534; } .ds-badge-amber { background: #fef3c7; color: #92400e; } .ds-badge-blue { background: #dbeafe; color: #1e40af; }"
+    },
+    {
+      "name": "Module Dot",
+      "kind": "custom",
+      "refersTo": "module-dot",
+      "description": "Small solid-color indicator fixed per product module, used on home/admin dashboards.",
+      "html": "<span class=\"ds-module-dot ds-module-dot-residents\"></span>",
+      "css": ".ds-module-dot { display: inline-block; width: 8px; height: 8px; border-radius: 9999px; } .ds-module-dot-residents { background: #0ea5e9; } .ds-module-dot-maintenance { background: #f59e0b; } .ds-module-dot-complaints { background: #f43f5e; } .ds-module-dot-visitors { background: #8b5cf6; } .ds-module-dot-notices { background: #10b981; }"
+    },
+    {
+      "name": "SOS Alarm Overlay",
+      "kind": "custom",
+      "refersTo": "sos-overlay",
+      "description": "Full-screen alarm modal, the product's signature and core differentiator — the one screen allowed to break the calm register.",
+      "html": "<div class=\"ds-sos-scrim\"><div class=\"ds-sos-card\"><p class=\"ds-sos-label\">SOS alarm</p><p class=\"ds-sos-status\">Resident needs help</p><p class=\"ds-sos-flat\">Flat A-101</p><button class=\"ds-btn-danger ds-sos-resolve\">Mark resolved</button></div></div>",
+      "css": ".ds-sos-scrim { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(76,5,25,0.8); backdrop-filter: blur(4px); padding: 16px; } .ds-sos-card { width: 100%; max-width: 384px; border-radius: 16px; background: #fff; padding: 24px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); } .ds-sos-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #dc2626; } .ds-sos-status { margin-top: 8px; font-size: 1.25rem; font-weight: 600; } .ds-sos-flat { margin-top: 4px; font-size: 0.875rem; color: #71717a; } .ds-sos-resolve { margin-top: 24px; width: 100%; background: #dc2626; color: #fff; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Ledger Room",
+    "overview": "VaseraOS reads like a well-run back office, not a consumer app: calm, precise, unfussy. Every screen exists to be scanned fast and trusted — a resident roster, a dues ledger, a complaint queue — by people who range from a tech-fluent office bearer to a resident or guard who is not tech-savvy. The aesthetic stays simple and elegant on purpose, leaning on conventions people already know rather than novel interaction patterns, so it feels immediately familiar rather than clever. Confirmed anti-reference: not the bright, card-heavy, consumer-flashy look of MyGate/NoBrokerHood-style RWA apps. VaseraOS's edge is the guard-alarm pipeline, not decorative polish — so the interface is deliberately quiet everywhere except the one place urgency is real: the SOS alarm overlay.",
+    "keyCharacteristics": [
+      "Zinc-neutral ink on white (and inverted in dark mode), one indigo accent, one red danger signal.",
+      "Flat, bordered surfaces by default; shadow is allowed on cards too, used to lift emphasis rather than as a default treatment.",
+      "A single consistent module-dot color per product area, repeated across home and admin dashboards.",
+      "One deliberate exception to the calm palette: the full-screen SOS alarm overlay, which goes loud because that moment is the product's whole reason to exist."
+    ],
+    "rules": [
+      { "name": "The One Danger Rule", "body": "Destructive or alarming UI uses red-*, never rose-*. UserMenu's logout control currently uses rose and is drift, not a second valid danger color.", "section": "colors" },
+      { "name": "The One Dot Per Module Rule", "body": "Each product module keeps exactly one identity color, used only as a small dot indicator — never promoted to a full background or button color.", "section": "colors" },
+      { "name": "The Loud Exception Rule", "body": "The SOS alarm overlay is the only screen allowed to break the system's calm register. Nothing else should use this intensity of color, blur, or motion.", "section": "components" }
+    ],
+    "dos": [
+      "Do keep the palette near-monochrome everywhere except module dots and the SOS overlay.",
+      "Do use red-* for every destructive/danger surface — button, color, badge tone, banner.",
+      "Do default to a border for separation; reach for shadow only to lift a genuinely floating or emphasized surface.",
+      "Do favor familiar, conventional UI patterns over novel interaction design — the audience includes non-tech-savvy residents and guards.",
+      "Do keep exactly one identity color per module, expressed only as a small dot indicator."
+    ],
+    "donts": [
+      "Don't use rose-* for destructive UI outside the SOS overlay — red-* is canonical; fix UserMenu's logout color rather than copying it elsewhere.",
+      "Don't add a second accent color; Ledger Indigo stays the only emphasis color outside module dots and the SOS overlay.",
+      "Don't give the SOS alarm overlay's intensity to any other screen.",
+      "Don't introduce decorative/novel UI patterns in pursuit of delight — simplicity and familiarity are the design goal for this audience."
+    ]
+  }
+}
