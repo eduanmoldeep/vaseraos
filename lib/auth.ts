@@ -2,13 +2,16 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { getEnv, uid, type AuthUser, type Env } from "./cloudflare";
+import { getOffices, hasOffice, isMember } from "./membership";
+import type { Office } from "./cloudflare";
 
 export type { AuthUser };
 
 export const SESSION_COOKIE = "vasera_session";
+export const IMPERSONATOR_COOKIE = "vasera_impersonator";
 const SESSION_TTL = 60 * 60 * 24 * 30; // 30 days
 
-type StoredUser = AuthUser & { password_hash: string };
+type StoredUser = AuthUser & { password_hash: string; created_at?: string };
 
 // ---- Passwords (scrypt, node:crypto — route handlers run on nodejs runtime) ----
 export function hashPassword(password: string): string {
@@ -79,6 +82,23 @@ export async function verifyLogin(email: string, password: string): Promise<{ us
   return { user: { id: found.id, name: found.name, email: found.email, admin: found.admin } };
 }
 
+/** All accounts, newest first — for the admin user list. Never exposes password hashes. */
+export async function listUsers(): Promise<(AuthUser & { createdAt: string })[]> {
+  const env = await getEnv();
+  if (env?.DB) {
+    const { results } = await env.DB.prepare("SELECT id, name, email, admin, created_at FROM users ORDER BY created_at DESC")
+      .all<{ id: string; name: string; email: string; admin: number; created_at: string }>();
+    return (results ?? []).map((r: { id: string; name: string; email: string; admin: number; created_at: string }) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      admin: r.admin === 1,
+      createdAt: r.created_at,
+    }));
+  }
+  return localUsers().map((u) => ({ id: u.id, name: u.name, email: u.email, admin: u.admin, createdAt: u.created_at ?? "" }));
+}
+
 // ---- Sessions: KV SESSIONS on Cloudflare, in-memory locally ----
 const localSessions = new Map<string, string>();
 
@@ -117,12 +137,90 @@ export async function getViewer(): Promise<AuthUser | null> {
   return (await findById(env, userId)) ?? null;
 }
 
-/** Gate for every non-auth API handler: 401 logged out, 403 non-admin. */
+/** The admin behind an impersonated session, or null when not impersonating. */
+export async function getImpersonator(): Promise<AuthUser | null> {
+  const token = (await cookies()).get(IMPERSONATOR_COOKIE)?.value;
+  if (!token) return null;
+  const env = await getEnv();
+  const userId = await (await sessionStore(env)).get(token);
+  if (!userId) return null;
+  return (await findById(env, userId)) ?? null;
+}
+
+/**
+ * Switches the active session to `targetUserId` while keeping the admin's own
+ * session alive under a second cookie, so "back to admin" needs no re-login.
+ */
+export async function startImpersonation(targetUserId: string): Promise<{ user?: AuthUser; error?: string }> {
+  const env = await getEnv();
+  const target = await findById(env, targetUserId);
+  if (!target) return { error: "User not found." };
+  const adminToken = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!adminToken) return { error: "Login required." };
+  const jar = await cookies();
+  jar.set(IMPERSONATOR_COOKIE, adminToken, sessionCookieOptions());
+  jar.set(SESSION_COOKIE, await createSession(target.id), sessionCookieOptions());
+  return { user: target };
+}
+
+/** Restores the admin's own session and discards the impersonated one. */
+export async function stopImpersonation(): Promise<{ user?: AuthUser; error?: string }> {
+  const jar = await cookies();
+  const adminToken = jar.get(IMPERSONATOR_COOKIE)?.value;
+  if (!adminToken) return { error: "Not impersonating." };
+  const impersonatedToken = jar.get(SESSION_COOKIE)?.value;
+  const env = await getEnv();
+  const adminId = await (await sessionStore(env)).get(adminToken);
+  const admin = adminId ? await findById(env, adminId) : undefined;
+  if (!admin) {
+    jar.delete(IMPERSONATOR_COOKIE);
+    return { error: "Admin session expired." };
+  }
+  if (impersonatedToken) await destroySession(impersonatedToken);
+  jar.set(SESSION_COOKIE, adminToken, sessionCookieOptions());
+  jar.delete(IMPERSONATOR_COOKIE);
+  return { user: admin };
+}
+
+/** Gate for platform-only routes (approvals, the global user list): 401 logged out, 403 non-admin. */
 export async function requireAdmin(): Promise<NextResponse | null> {
   const viewer = await getViewer();
   if (!viewer) return NextResponse.json({ error: "Login required." }, { status: 401 });
   if (!viewer.admin) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
   return null;
+}
+
+/**
+ * Gate for a single society's admin CRUD routes: a platform admin, or a user
+ * currently holding ANY office (president/secretary/treasurer) in THIS
+ * society. Privilege lives on the office, not the person — vacate the office
+ * and the access goes with it, no separate "admin" flag to also revoke.
+ */
+export async function requireSocietyAdmin(societyId: string): Promise<NextResponse | null> {
+  const viewer = await getViewer();
+  if (!viewer) return NextResponse.json({ error: "Login required." }, { status: 401 });
+  if (viewer.admin) return null;
+  const offices = await getOffices(viewer.id, societyId);
+  if (offices.length > 0) return null;
+  return NextResponse.json({ error: "An elected office (president, secretary or treasurer) is required for this society." }, { status: 403 });
+}
+
+/** Gate for one specific office's action (e.g. notices are president-only), plus the platform-admin override. */
+export async function requireSocietyOffice(societyId: string, office: Office): Promise<NextResponse | null> {
+  const viewer = await getViewer();
+  if (!viewer) return NextResponse.json({ error: "Login required." }, { status: 401 });
+  if (viewer.admin) return null;
+  if (await hasOffice(viewer.id, societyId, office)) return null;
+  return NextResponse.json({ error: `Only the society's ${office} can do this.` }, { status: 403 });
+}
+
+/** Gate for read/self-service routes: any member of the society (office-holder or plain resident), or a platform admin. */
+export async function requireSocietyMember(societyId: string): Promise<NextResponse | null> {
+  const viewer = await getViewer();
+  if (!viewer) return NextResponse.json({ error: "Login required." }, { status: 401 });
+  if (viewer.admin) return null;
+  if (await isMember(viewer.id, societyId)) return null;
+  return NextResponse.json({ error: "You're not a member of this society." }, { status: 403 });
 }
 
 export function sessionCookieOptions() {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Card, Empty, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader, Select } from "@/components/ui";
 import { NeedsSociety } from "@/components/NeedsSociety";
 import type { Complaint } from "@/lib/cloudflare";
 import { getSelectedSociety } from "@/lib/society";
@@ -10,10 +10,19 @@ export default function ComplaintsPage() {
   const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
   const [rows, setRows] = useState<Complaint[]>([]);
   const [form, setForm] = useState({ flat: "", title: "", category: "general" });
+  const [loading, setLoading] = useState(() => !!getSelectedSociety());
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const load = (id: string | null = society) => {
-    if (!id) { setRows([]); return; }
-    fetch(`/api/complaints?society=${id}`).then((r) => r.json()).then(setRows).catch(() => {});
+    if (!id) { setRows([]); setLoading(false); return; }
+    setLoading(true);
+    setError("");
+    fetch(`/api/complaints?society=${id}`)
+      .then((r) => r.json())
+      .then(setRows)
+      .catch(() => setError("Couldn't load complaints."))
+      .finally(() => setLoading(false));
   };
   useEffect(() => {
     const id = getSelectedSociety();
@@ -21,7 +30,8 @@ export default function ComplaintsPage() {
       fetch(`/api/complaints?society=${id}`)
         .then((r) => r.json())
         .then((data) => { if (data) setRows(data); })
-        .catch(() => {});
+        .catch(() => setError("Couldn't load complaints."))
+        .finally(() => setLoading(false));
     }
     const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
     window.addEventListener("vaseraos-society", onSwitch);
@@ -30,9 +40,16 @@ export default function ComplaintsPage() {
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    await fetch("/api/complaints", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, society_id: getSelectedSociety() }) });
-    setForm({ flat: "", title: "", category: "general" });
-    load();
+    setSaving(true);
+    try {
+      await fetch("/api/complaints", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, society_id: getSelectedSociety() }) });
+      setForm({ flat: "", title: "", category: "general" });
+      load();
+    } catch {
+      setError("Couldn't raise ticket. Try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function setStatus(id: string, status: string) {
@@ -64,47 +81,50 @@ export default function ComplaintsPage() {
       <PageHeader title="Complaints" subtitle="Track tickets from open to resolved." />
       <Card>
         <form onSubmit={add} className="grid gap-3 sm:grid-cols-4">
-          <input required placeholder="Flat" value={form.flat} onChange={(e) => setForm({ ...form, flat: e.target.value })} className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
-          <input required placeholder="Issue title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
-          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900">
+          <Input required placeholder="Flat" value={form.flat} onChange={(e) => setForm({ ...form, flat: e.target.value })} />
+          <Input required placeholder="Issue title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
             <option value="general">General</option>
             <option value="maintenance">Maintenance</option>
             <option value="plumbing">Plumbing</option>
             <option value="electrical">Electrical</option>
             <option value="security">Security</option>
-          </select>
-          <button className="rounded-lg bg-zinc-950 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-black">Raise ticket</button>
+          </Select>
+          <Button busy={saving} busyText="Raising…">Raise ticket</Button>
         </form>
       </Card>
+      {error ? <div className="mt-4"><ErrorBanner text={error} onRetry={() => load()} /></div> : null}
       <div className="mt-4 grid gap-3">
-        {rows.length === 0 ? <Empty text="No complaints." /> : rows.map((c) => (
-          <Card key={c.id} className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-medium">{c.title}</p>
-              <p className="text-xs text-zinc-500">{c.flat} · {c.category}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge tone={c.status === "resolved" ? "green" : c.status === "in_progress" ? "blue" : "amber"}>{c.status.replace("_", " ")}</Badge>
-              <select
-                value={c.status}
-                onChange={(e) => setStatus(c.id, e.target.value)}
-                className="rounded-lg border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
-                aria-label={`Complaint status for ${c.title}`}
-              >
-                <option value="open">open</option>
-                <option value="in_progress">in progress</option>
-                <option value="resolved">resolved</option>
-              </select>
-              <button
-                onClick={() => remove(c.id)}
-                className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                aria-label={`Delete complaint ${c.title}`}
-              >
-                Delete
-              </button>
-            </div>
-          </Card>
-        ))}
+        {loading ? (
+          <ListSkeleton />
+        ) : rows.length === 0 ? (
+          <Empty text="No complaints." />
+        ) : (
+          rows.map((c) => (
+            <Card key={c.id} className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-medium">{c.title}</p>
+                <p className="text-xs text-zinc-500">{c.flat} · {c.category}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge tone={c.status === "resolved" ? "green" : c.status === "in_progress" ? "blue" : "amber"}>{c.status.replace("_", " ")}</Badge>
+                <Select
+                  value={c.status}
+                  onChange={(e) => setStatus(c.id, e.target.value)}
+                  className="w-auto px-2 py-1 text-xs"
+                  aria-label={`Complaint status for ${c.title}`}
+                >
+                  <option value="open">open</option>
+                  <option value="in_progress">in progress</option>
+                  <option value="resolved">resolved</option>
+                </Select>
+                <Button variant="danger" size="sm" onClick={() => remove(c.id)} aria-label={`Delete complaint ${c.title}`}>
+                  Delete
+                </Button>
+              </div>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );

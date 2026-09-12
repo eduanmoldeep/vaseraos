@@ -24,12 +24,37 @@ export type Society = {
   id: string;
   name: string;
   city?: string;
+  status: "pending" | "approved" | "rejected";
+  join_code?: string | null;
+  created_by?: string | null;
 };
 
 export const DEFAULT_SOCIETY_ID = "s_default";
 
-/** Account holder. `admin` is granted only by direct DB SQL — never via API/UI. */
+/** Account holder. `admin` (platform-wide) is granted only by direct DB SQL — never via API/UI. */
 export type AuthUser = { id: string; name: string; email: string; admin: boolean };
+
+/**
+ * Plain membership in a society — everyone who joined or created it is a
+ * resident of it. Admin-level privilege is never stored here: it comes only
+ * from holding a `SocietyOffice` below, so it rotates with the office.
+ */
+export type SocietyMember = { id: string; user_id: string; society_id: string };
+
+/** Elected society offices — independent of the admin/resident role; any combo, any holder(s). */
+export type Office = "president" | "secretary" | "treasurer";
+export type SocietyOffice = { society_id: string; user_id: string; office: Office };
+
+export type AuditEntry = {
+  id: string;
+  actor_id: string;
+  action: string;
+  target_user_id?: string | null;
+  society_id?: string | null;
+  detail?: string | null;
+  ip: string;
+  created_at: string;
+};
 
 export type Resident = {
   id: string;
@@ -81,6 +106,9 @@ export type Notice = {
 const g = globalThis as unknown as {
   __vasera?: {
     societies: Society[];
+    members: SocietyMember[];
+    offices: SocietyOffice[];
+    auditLog: AuditEntry[];
     residents: Resident[];
     bills: Bill[];
     complaints: Complaint[];
@@ -93,9 +121,12 @@ export function mockStore() {
   if (!g.__vasera) {
     g.__vasera = {
       societies: [
-        { id: "s_default", name: "Greenview Heights", city: "Pune" },
-        { id: "s2", name: "Lakeview Residency", city: "Mumbai" },
+        { id: "s_default", name: "Greenview Heights", city: "Pune", status: "approved", join_code: "GREEN01" },
+        { id: "s2", name: "Lakeview Residency", city: "Mumbai", status: "approved", join_code: "LAKE02" },
       ],
+      members: [],
+      offices: [],
+      auditLog: [],
       residents: [
         { id: "r1", name: "Aarav Sharma", flat: "A-101", phone: "98200 11111", email: "aarav@example.com", members: 4, owner_tenant: "owner", society_id: "s_default" },
         { id: "r2", name: "Meera Iyer", flat: "B-204", phone: "98200 22222", members: 3, owner_tenant: "tenant", society_id: "s_default" },

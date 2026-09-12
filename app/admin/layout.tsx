@@ -1,50 +1,40 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
+import { getSocietiesWithAnyOffice } from "@/lib/membership";
+import { AdminSidebar } from "@/components/AdminSidebar";
+import { AdminNav } from "@/components/AdminNav";
 import { SocietySwitcher } from "@/components/SocietySwitcher";
 import { LogoutButton } from "@/components/LogoutButton";
 
-const NAV = [
-  { href: "/admin", label: "Dashboard" },
-  { href: "/admin/societies", label: "Societies" },
-  { href: "/admin/residents", label: "Residents" },
-  { href: "/admin/maintenance", label: "Maintenance" },
-  { href: "/admin/complaints", label: "Complaints" },
-  { href: "/admin/visitors", label: "Visitors" },
-  { href: "/admin/notices", label: "Notices" },
-];
-
-/** Admin-only shell: non-admins and logged-out users bounce to the landing page. */
+/**
+ * Admin shell: platform admins get in always; everyone else needs to currently
+ * hold an office (president/secretary/treasurer) in at least one society —
+ * that's the only source of admin privilege. Plain residents and logged-out
+ * visitors bounce to the landing page.
+ */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const viewer = await getViewer();
-  if (!viewer?.admin) redirect("/");
+  if (!viewer) redirect("/");
+  if (!viewer.admin) {
+    const officeSocieties = await getSocietiesWithAnyOffice(viewer.id);
+    if (officeSocieties.length === 0) redirect("/");
+  }
 
   return (
-    <>
-      <header className="sticky top-0 z-10 border-b border-teal-900/20 bg-gradient-to-r from-teal-950 via-teal-900 to-emerald-900 text-white shadow-md">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <Link href="/admin" className="flex items-center gap-2 font-semibold">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-sm font-bold text-teal-900 shadow">
-              V
-            </span>
-            VaseraOS
-          </Link>
-          <nav className="flex flex-1 items-center gap-1 overflow-x-auto text-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {NAV.map((n) => (
-              <Link
-                key={n.href}
-                href={n.href}
-                  className="whitespace-nowrap rounded-full px-3 py-1.5 text-white transition hover:bg-white/15"
-              >
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          <SocietySwitcher />
-          <LogoutButton />
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
-    </>
+    <div className="flex flex-1">
+      <AdminSidebar />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95 md:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <SocietySwitcher compact />
+            <LogoutButton />
+          </div>
+          <div className="mt-3">
+            <AdminNav />
+          </div>
+        </header>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-8">{children}</main>
+      </div>
+    </div>
   );
 }

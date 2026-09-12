@@ -1,12 +1,14 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { SESSION_COOKIE, destroySession } from "@/lib/auth";
+import { IMPERSONATOR_COOKIE, SESSION_COOKIE, destroySession } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function POST() {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
   if (token) await destroySession(token);
-  (await cookies()).delete(SESSION_COOKIE);
+  jar.delete(SESSION_COOKIE);
+  jar.delete(IMPERSONATOR_COOKIE);
   return NextResponse.json({ ok: true });
 }

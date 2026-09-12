@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getEnv, mockStore, uid, DEFAULT_SOCIETY_ID, type Complaint } from "@/lib/cloudflare";
-import { requireAdmin } from "@/lib/auth";
+import { requireSocietyAdmin, requireSocietyMember } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
   const society_id = new URL(req.url).searchParams.get("society") ?? DEFAULT_SOCIETY_ID;
+  const denied = await requireSocietyMember(society_id);
+  if (denied) return denied;
   const env = await getEnv();
   if (env?.DB) {
     const { results } = await env.DB.prepare("SELECT * FROM complaints WHERE society_id = ? ORDER BY created_at DESC")
@@ -19,17 +19,19 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  const society_id = String(body.society_id ?? body.society ?? DEFAULT_SOCIETY_ID);
+  // Any member can raise a ticket — residents raise their own, admins raise on a resident's behalf.
+  const denied = await requireSocietyMember(society_id);
+  if (denied) return denied;
   const complaint = {
     id: uid("c"),
     flat: String(body.flat ?? "A-101"),
     title: String(body.title ?? "New complaint"),
     category: String(body.category ?? "general"),
     status: (["open", "in_progress", "resolved"].includes(body.status) ? body.status : "open") as "open" | "in_progress" | "resolved",
-    society_id: String(body.society_id ?? body.society ?? DEFAULT_SOCIETY_ID),
+    society_id,
   };
   const env = await getEnv();
   if (env?.DB) {
@@ -45,8 +47,6 @@ export async function POST(req: Request) {
 const COMPLAINT_STATUSES = ["open", "in_progress", "resolved"] as const;
 
 export async function PATCH(req: Request) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   const id = String(body.id ?? "");
@@ -56,37 +56,39 @@ export async function PATCH(req: Request) {
   }
   const env = await getEnv();
   if (env?.DB) {
-    const res = await env.DB.prepare("UPDATE complaints SET status = ? WHERE id = ?")
-      .bind(status, id)
-      .run();
-    if (res.meta.changes === 0) {
-      return NextResponse.json({ error: "Complaint not found" }, { status: 404 });
-    }
-    const row = await env.DB.prepare("SELECT * FROM complaints WHERE id = ?").bind(id).first();
-    return NextResponse.json(row);
+    const row = await env.DB.prepare("SELECT society_id FROM complaints WHERE id = ?").bind(id).first<{ society_id: string }>();
+    if (!row) return NextResponse.json({ error: "Complaint not found" }, { status: 404 });
+    const denied = await requireSocietyAdmin(row.society_id);
+    if (denied) return denied;
+    await env.DB.prepare("UPDATE complaints SET status = ? WHERE id = ?").bind(status, id).run();
+    const updated = await env.DB.prepare("SELECT * FROM complaints WHERE id = ?").bind(id).first();
+    return NextResponse.json(updated);
   }
   const complaint = mockStore().complaints.find((c) => c.id === id);
   if (!complaint) return NextResponse.json({ error: "Complaint not found" }, { status: 404 });
+  const denied = await requireSocietyAdmin(complaint.society_id);
+  if (denied) return denied;
   complaint.status = status as Complaint["status"];
   return NextResponse.json(complaint);
 }
 
 export async function DELETE(req: Request) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
   const id = new URL(req.url).searchParams.get("id") ?? "";
   if (!id) return NextResponse.json({ error: "Provide ?id=" }, { status: 400 });
   const env = await getEnv();
   if (env?.DB) {
-    const res = await env.DB.prepare("DELETE FROM complaints WHERE id = ?").bind(id).run();
-    if (res.meta.changes === 0) {
-      return NextResponse.json({ error: "Complaint not found" }, { status: 404 });
-    }
+    const row = await env.DB.prepare("SELECT society_id FROM complaints WHERE id = ?").bind(id).first<{ society_id: string }>();
+    if (!row) return NextResponse.json({ error: "Complaint not found" }, { status: 404 });
+    const denied = await requireSocietyAdmin(row.society_id);
+    if (denied) return denied;
+    await env.DB.prepare("DELETE FROM complaints WHERE id = ?").bind(id).run();
     return NextResponse.json({ ok: true, id });
   }
   const store = mockStore();
   const idx = store.complaints.findIndex((c) => c.id === id);
   if (idx === -1) return NextResponse.json({ error: "Complaint not found" }, { status: 404 });
+  const denied = await requireSocietyAdmin(store.complaints[idx].society_id);
+  if (denied) return denied;
   store.complaints.splice(idx, 1);
   return NextResponse.json({ ok: true, id });
 }

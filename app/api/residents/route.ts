@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { DEFAULT_SOCIETY_ID, getEnv, mockStore, uid } from "@/lib/cloudflare";
-import { requireAdmin } from "@/lib/auth";
+import { requireSocietyAdmin } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
   const society_id = new URL(req.url).searchParams.get("society") ?? DEFAULT_SOCIETY_ID;
+  const denied = await requireSocietyAdmin(society_id);
+  if (denied) return denied;
   const env = await getEnv();
   if (env?.DB) {
     const { results } = await env.DB.prepare("SELECT * FROM residents WHERE society_id = ? ORDER BY flat")
@@ -19,10 +19,11 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  const society_id = String(body.society_id ?? body.society ?? DEFAULT_SOCIETY_ID);
+  const denied = await requireSocietyAdmin(society_id);
+  if (denied) return denied;
   const resident = {
     id: uid("r"),
     name: String(body.name ?? "New Resident"),
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
     email: body.email ? String(body.email) : undefined,
     members: Number(body.members ?? 1),
     owner_tenant: (body.owner_tenant === "tenant" ? "tenant" : "owner") as "owner" | "tenant",
-    society_id: String(body.society_id ?? body.society ?? DEFAULT_SOCIETY_ID),
+    society_id,
   };
   const env = await getEnv();
   if (env?.DB) {
@@ -47,21 +48,22 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
   const id = new URL(req.url).searchParams.get("id") ?? "";
   if (!id) return NextResponse.json({ error: "Provide ?id=" }, { status: 400 });
   const env = await getEnv();
   if (env?.DB) {
-    const res = await env.DB.prepare("DELETE FROM residents WHERE id = ?").bind(id).run();
-    if (res.meta.changes === 0) {
-      return NextResponse.json({ error: "Resident not found" }, { status: 404 });
-    }
+    const row = await env.DB.prepare("SELECT society_id FROM residents WHERE id = ?").bind(id).first<{ society_id: string }>();
+    if (!row) return NextResponse.json({ error: "Resident not found" }, { status: 404 });
+    const denied = await requireSocietyAdmin(row.society_id);
+    if (denied) return denied;
+    await env.DB.prepare("DELETE FROM residents WHERE id = ?").bind(id).run();
     return NextResponse.json({ ok: true, id });
   }
   const store = mockStore();
   const idx = store.residents.findIndex((r) => r.id === id);
   if (idx === -1) return NextResponse.json({ error: "Resident not found" }, { status: 404 });
+  const denied = await requireSocietyAdmin(store.residents[idx].society_id);
+  if (denied) return denied;
   store.residents.splice(idx, 1);
   return NextResponse.json({ ok: true, id });
 }
