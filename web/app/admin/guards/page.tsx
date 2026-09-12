@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { Badge, Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader } from "@/components/ui";
 import { NeedsSociety } from "@/components/NeedsSociety";
-import { getSelectedSociety } from "@/lib/society";
+import { getSelectedSociety, useSelectedSociety } from "@/lib/society";
 import type { Guard } from "@/lib/cloudflare";
 
 export default function GuardsPage() {
-  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
+  const society = useSelectedSociety();
   const [rows, setRows] = useState<Guard[]>([]);
-  const [loading, setLoading] = useState(() => !!getSelectedSociety());
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", phone: "", password: "" });
   const [saving, setSaving] = useState(false);
@@ -27,18 +27,9 @@ export default function GuardsPage() {
   };
 
   useEffect(() => {
-    const id = getSelectedSociety();
-    if (id) {
-      fetch(`/api/guards?society=${id}`)
-        .then((r) => r.json())
-        .then((data) => { if (data) setRows(data); })
-        .catch(() => setError("Couldn't load guards."))
-        .finally(() => setLoading(false));
-    }
-    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
-    window.addEventListener("vaseraos-society", onSwitch);
-    return () => window.removeEventListener("vaseraos-society", onSwitch);
-  }, []);
+    startTransition(() => load(society));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [society]);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();

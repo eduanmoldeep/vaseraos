@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Society } from "@/lib/cloudflare";
-import { getSelectedSociety, setSelectedSociety } from "@/lib/society";
+import { getSelectedSociety, setSelectedSociety, useSelectedSociety } from "@/lib/society";
 
 /**
  * The app's identity control: shows the active society (not the VaseraOS brand)
@@ -11,7 +11,7 @@ import { getSelectedSociety, setSelectedSociety } from "@/lib/society";
  */
 export function SocietySwitcher({ compact = false }: { compact?: boolean }) {
   const [societies, setSocieties] = useState<Society[]>([]);
-  const [current, setCurrent] = useState<string | null>(() => getSelectedSociety());
+  const current = useSelectedSociety();
 
   useEffect(() => {
     fetch("/api/societies")
@@ -21,13 +21,9 @@ export function SocietySwitcher({ compact = false }: { compact?: boolean }) {
         const stored = getSelectedSociety();
         if (stored && rows.length > 0 && !rows.some((s) => s.id === stored)) {
           setSelectedSociety(null);
-          setCurrent(null);
         }
       })
       .catch(() => {});
-    const onChange = (e: Event) => setCurrent((e as CustomEvent<string | null>).detail ?? null);
-    window.addEventListener("vaseraos-society", onChange);
-    return () => window.removeEventListener("vaseraos-society", onChange);
   }, []);
 
   const name = societies.find((s) => s.id === current)?.name ?? "";
@@ -44,7 +40,6 @@ export function SocietySwitcher({ compact = false }: { compact?: boolean }) {
           onChange={(e) => {
             const id = e.target.value || null;
             setSelectedSociety(id);
-            setCurrent(id);
             window.location.reload();
           }}
           className="w-full max-w-44 truncate bg-transparent text-sm font-semibold text-zinc-900 outline-none dark:text-zinc-50"

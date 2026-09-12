@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Badge, Button, Card, Empty, ErrorBanner, Input, PageHeader, Select } from "@/components/ui";
 import { NotificationBell } from "@/components/NotificationBell";
 import { UserMenu } from "@/components/UserMenu";
@@ -11,7 +12,6 @@ import { setSelectedSociety } from "@/lib/society";
 type Membership = { societyId: string; name: string; status: string; offices: string[] };
 type Summary = { residents: number; dues: number; openComplaints: number; activeVisitors: number };
 type Notice = { id: string; title: string; body: string };
-type Complaint = { id: string; flat: string; title: string; category: string; status: string };
 type Visitor = { id: string; name: string; flat: string; purpose: string; status: string };
 type SosAlert = { id: string; flat: string; status: "open" | "acknowledged" | "resolved"; raised_by_user_id: string };
 
@@ -23,13 +23,11 @@ export default function ResidentApp() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [error, setError] = useState("");
   const [myFlat, setMyFlat] = useState<string | null>(null);
-  const [complaintForm, setComplaintForm] = useState({ title: "", category: "general" });
+  const [myOpenComplaints, setMyOpenComplaints] = useState<number | null>(null);
   const [visitorForm, setVisitorForm] = useState({ name: "", flat: "", purpose: "Guest" });
-  const [savingComplaint, setSavingComplaint] = useState(false);
   const [savingVisitor, setSavingVisitor] = useState(false);
   const [sosFlat, setSosFlat] = useState("");
   const [sosAlert, setSosAlert] = useState<SosAlert | null>(null);
@@ -62,9 +60,12 @@ export default function ResidentApp() {
   const loadSociety = (id: string) => {
     fetch(`/api/summary?society=${id}`).then((r) => r.json()).then(setSummary).catch(() => {});
     fetch(`/api/notices?society=${id}`).then((r) => r.json()).then(setNotices).catch(() => {});
-    fetch(`/api/complaints?society=${id}`).then((r) => r.json()).then(setComplaints).catch(() => {});
     fetch(`/api/visitors?society=${id}`).then((r) => r.json()).then(setVisitors).catch(() => {});
     fetch(`/api/me/flat?society=${id}`).then((r) => r.json()).then((d) => setMyFlat(d?.flat ?? null)).catch(() => {});
+    fetch(`/api/complaints?society=${id}&mine=1`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: { status: string }[]) => setMyOpenComplaints(rows.filter((c) => c.status !== "resolved").length))
+      .catch(() => {});
     fetch(`/api/sos?society=${id}`)
       .then((r) => r.json())
       .then((rows: SosAlert[]) => setSosAlert(rows.find((s) => s.raised_by_user_id === viewer?.id) ?? null))
@@ -99,23 +100,6 @@ export default function ResidentApp() {
       setSosAlert(data);
     } finally {
       setRaisingSos(false);
-    }
-  }
-
-  async function raiseComplaint(e: React.FormEvent) {
-    e.preventDefault();
-    if (!activeId) return;
-    setSavingComplaint(true);
-    try {
-      await fetch("/api/complaints", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...complaintForm, society_id: activeId }),
-      });
-      setComplaintForm({ title: "", category: "general" });
-      loadSociety(activeId);
-    } finally {
-      setSavingComplaint(false);
     }
   }
 
@@ -191,7 +175,7 @@ export default function ResidentApp() {
           <form onSubmit={raiseSos} className="flex flex-wrap items-center gap-3">
             <Input required placeholder="Your flat" value={sosFlat} onChange={(e) => setSosFlat(e.target.value)} className="max-w-[10rem]" />
             <Button variant="danger" busy={raisingSos} busyText="Raising SOS…">🚨 Raise SOS</Button>
-            <p className="text-sm text-zinc-500">Alerts the society's guard and office-holders immediately.</p>
+            <p className="text-sm text-zinc-500">Alerts the society&apos;s guard and office-holders immediately.</p>
           </form>
         )}
       </Card>
@@ -201,10 +185,12 @@ export default function ResidentApp() {
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Dues</p>
           <p className="mt-1 text-xl font-semibold">{summary ? `₹${summary.dues.toLocaleString("en-IN")}` : "—"}</p>
         </Card>
-        <Card>
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Open complaints</p>
-          <p className="mt-1 text-xl font-semibold">{summary?.openComplaints ?? "—"}</p>
-        </Card>
+        <Link href="/complaints">
+          <Card className="transition hover:bg-zinc-50 dark:hover:bg-zinc-900">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">My open complaints</p>
+            <p className="mt-1 text-xl font-semibold">{myOpenComplaints ?? "—"}</p>
+          </Card>
+        </Link>
         <Card>
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Active visitors</p>
           <p className="mt-1 text-xl font-semibold">{summary?.activeVisitors ?? "—"}</p>
@@ -228,35 +214,19 @@ export default function ResidentApp() {
           <PageHeader title="Complaints" />
           <Card>
             {myFlat ? (
-              <form onSubmit={raiseComplaint} className="grid gap-2">
-                <p className="text-xs text-zinc-500">Raising for flat <span className="font-medium text-zinc-700 dark:text-zinc-300">{myFlat}</span></p>
-                <Input required placeholder="What's the issue?" value={complaintForm.title} onChange={(e) => setComplaintForm({ ...complaintForm, title: e.target.value })} />
-                <Select value={complaintForm.category} onChange={(e) => setComplaintForm({ ...complaintForm, category: e.target.value })}>
-                  <option value="general">General</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="plumbing">Plumbing</option>
-                  <option value="electrical">Electrical</option>
-                  <option value="security">Security</option>
-                </Select>
-                <Button busy={savingComplaint} busyText="Raising…">Raise complaint</Button>
-              </form>
+              <p className="text-sm text-zinc-500">
+                Raising for flat <span className="font-medium text-zinc-700 dark:text-zinc-300">{myFlat}</span>. Raise a ticket and track
+                its status on your own complaints page.
+              </p>
             ) : (
               <p className="text-sm text-zinc-500">
                 Your account isn&apos;t linked to a flat yet — ask your society admin to add you as a resident using this account&apos;s email.
               </p>
             )}
+            <Link href="/complaints" className="mt-3 inline-block text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+              View my complaints →
+            </Link>
           </Card>
-          <div className="mt-3 grid gap-2">
-            {complaints.length === 0 ? <p className="text-sm text-zinc-500">No complaints yet.</p> : complaints.map((c) => (
-              <Card key={c.id} className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium">{c.title}</p>
-                  <p className="text-xs text-zinc-500">{c.flat} · {c.category}</p>
-                </div>
-                <Badge tone={c.status === "resolved" ? "green" : c.status === "in_progress" ? "blue" : "amber"}>{c.status.replace("_", " ")}</Badge>
-              </Card>
-            ))}
-          </div>
         </div>
 
         <div>

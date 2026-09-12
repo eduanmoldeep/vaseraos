@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { Badge, Card, Empty, ErrorBanner, ListSkeleton, PageHeader } from "@/components/ui";
 import { NeedsSociety } from "@/components/NeedsSociety";
-import { getSelectedSociety } from "@/lib/society";
+import { useSelectedSociety } from "@/lib/society";
 import type { Office } from "@/lib/cloudflare";
 
 type MemberRow = { userId: string; name: string; email: string; offices: Office[] };
@@ -15,9 +15,9 @@ const OFFICES: { value: Office; label: string; tone: "blue" | "green" | "amber" 
 ];
 
 export default function RolesPage() {
-  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
+  const society = useSelectedSociety();
   const [rows, setRows] = useState<MemberRow[]>([]);
-  const [loading, setLoading] = useState(() => !!getSelectedSociety());
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
@@ -33,18 +33,9 @@ export default function RolesPage() {
   };
 
   useEffect(() => {
-    const id = getSelectedSociety();
-    if (id) {
-      fetch(`/api/societies/offices?society=${id}`)
-        .then((r) => r.json())
-        .then((data) => { if (data) setRows(data); })
-        .catch(() => setError("Couldn't load roles."))
-        .finally(() => setLoading(false));
-    }
-    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
-    window.addEventListener("vaseraos-society", onSwitch);
-    return () => window.removeEventListener("vaseraos-society", onSwitch);
-  }, []);
+    startTransition(() => load(society));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [society]);
 
   async function toggle(userId: string, office: Office, currentOffices: Office[]) {
     const key = `${userId}:${office}`;

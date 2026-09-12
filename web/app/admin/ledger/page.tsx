@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { Badge, Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader, Select } from "@/components/ui";
 import { NeedsSociety } from "@/components/NeedsSociety";
 import type { Expense } from "@/lib/cloudflare";
-import { getSelectedSociety } from "@/lib/society";
+import { getSelectedSociety, useSelectedSociety } from "@/lib/society";
 
 type LedgerEntry = { id: string; type: "income" | "expense"; label: string; amount: number; date: string; receipt_key: string | null };
 type Ledger = { income: number; expenses: number; balance: number; entries: LedgerEntry[] };
@@ -13,12 +13,12 @@ const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 const receiptUrl = (key: string) => `/api/uploads/${key}`;
 
 export default function LedgerPage() {
-  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
+  const society = useSelectedSociety();
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [form, setForm] = useState({ vendor: "", category: "general", amount: "", description: "" });
   const [receipt, setReceipt] = useState<File | null>(null);
-  const [loading, setLoading] = useState(() => !!getSelectedSociety());
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -36,16 +36,9 @@ export default function LedgerPage() {
   };
 
   useEffect(() => {
-    load();
-    const onSwitch = (e: Event) => {
-      const next = (e as CustomEvent<string | null>).detail ?? null;
-      setSociety(next);
-      load(next);
-    };
-    window.addEventListener("vaseraos-society", onSwitch);
-    return () => window.removeEventListener("vaseraos-society", onSwitch);
+    startTransition(() => load(society));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [society]);
 
   async function addExpense(e: React.FormEvent) {
     e.preventDefault();

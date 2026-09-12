@@ -1,22 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { Badge, Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader, Select } from "@/components/ui";
 import { NeedsSociety } from "@/components/NeedsSociety";
 import type { Bill, Cadence, MaintenanceSetting } from "@/lib/cloudflare";
-import { getSelectedSociety } from "@/lib/society";
+import { getSelectedSociety, useSelectedSociety } from "@/lib/society";
 
 const CADENCE_LABEL: Record<Cadence, string> = { monthly: "Monthly", quarterly: "Quarterly", yearly: "Yearly" };
 
 export default function MaintenancePage() {
-  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
+  const society = useSelectedSociety();
   const [rows, setRows] = useState<Bill[]>([]);
   const [setting, setSetting] = useState<MaintenanceSetting | null>(null);
   const [settingForm, setSettingForm] = useState({ amount: "", cadence: "monthly" as Cadence });
   const [settingError, setSettingError] = useState("");
   const [savingSetting, setSavingSetting] = useState(false);
   const [form, setForm] = useState({ flat: "", amount: "", month: "2026-09" });
-  const [loading, setLoading] = useState(() => !!getSelectedSociety());
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [receiptFiles, setReceiptFiles] = useState<Record<string, File | null>>({});
@@ -43,30 +43,9 @@ export default function MaintenancePage() {
       .finally(() => setLoading(false));
   };
   useEffect(() => {
-    const id = getSelectedSociety();
-    if (id) {
-      fetch(`/api/bills?society=${id}`)
-        .then((r) => r.json())
-        .then((data) => { if (data) setRows(data); })
-        .catch(() => setError("Couldn't load bills."))
-        .finally(() => setLoading(false));
-      fetch(`/api/maintenance/settings?society=${id}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data: MaintenanceSetting | null) => {
-          setSetting(data ?? null);
-          if (data) setSettingForm({ amount: String(data.amount), cadence: data.cadence });
-        })
-        .catch(() => {});
-    }
-    const onSwitch = (e: Event) => {
-      const next = (e as CustomEvent<string | null>).detail ?? null;
-      setSociety(next);
-      load(next);
-      loadSetting(next);
-    };
-    window.addEventListener("vaseraos-society", onSwitch);
-    return () => window.removeEventListener("vaseraos-society", onSwitch);
-  }, []);
+    startTransition(() => { load(society); loadSetting(society); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [society]);
 
   async function saveSetting(e: React.FormEvent) {
     e.preventDefault();

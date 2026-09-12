@@ -6,17 +6,28 @@ import { getMyFlat, getOffices } from "@/lib/membership";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const society_id = new URL(req.url).searchParams.get("society") ?? DEFAULT_SOCIETY_ID;
+  const url = new URL(req.url);
+  const society_id = url.searchParams.get("society") ?? DEFAULT_SOCIETY_ID;
+  const mine = url.searchParams.get("mine") === "1";
   const denied = await requireSocietyMember(society_id);
   if (denied) return denied;
+
+  let myFlat: string | null = null;
+  if (mine) {
+    const viewer = (await getViewer())!; // requireSocietyMember already confirmed a logged-in viewer
+    myFlat = await getMyFlat(viewer.id, viewer.email, society_id);
+    if (!myFlat) return NextResponse.json([]);
+  }
+
   const env = await getEnv();
   if (env?.DB) {
     const { results } = await env.DB.prepare("SELECT * FROM complaints WHERE society_id = ? ORDER BY created_at DESC")
       .bind(society_id)
-      .all();
-    return NextResponse.json(results);
+      .all<Complaint>();
+    return NextResponse.json(mine ? (results as Complaint[]).filter((c) => c.flat === myFlat) : results);
   }
-  return NextResponse.json(mockStore().complaints.filter((c) => c.society_id === society_id));
+  const rows = mockStore().complaints.filter((c) => c.society_id === society_id);
+  return NextResponse.json(mine ? rows.filter((c) => c.flat === myFlat) : rows);
 }
 
 export async function POST(req: Request) {

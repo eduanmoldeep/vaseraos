@@ -1,4 +1,4 @@
-import { getEnv, uid, type Env, type Society, type Office, mockStore } from "./cloudflare";
+import { getEnv, uid, type Env, type Society, type Office, type Resident, mockStore } from "./cloudflare";
 
 export type Membership = { societyId: string };
 
@@ -49,6 +49,33 @@ export async function getMyFlat(userId: string, userEmail: string, societyId: st
   const resident = store.residents.find((r) => r.society_id === societyId && r.user_id === userId)
     ?? store.residents.find((r) => r.society_id === societyId && r.email?.toLowerCase() === userEmail.toLowerCase());
   return resident?.flat ?? null;
+}
+
+/**
+ * The full resident record this user occupies in a society, or null if unlinked.
+ * Same matching as `getMyFlat` (user_id first, opportunistic email link), returning
+ * the whole row so self-service "My info" can show/edit it.
+ */
+export async function getMyResident(userId: string, userEmail: string, societyId: string): Promise<Resident | null> {
+  const env = await getEnv();
+  const conn = await db(env);
+  if (conn) {
+    const byId = await conn.prepare("SELECT * FROM residents WHERE society_id = ? AND user_id = ?")
+      .bind(societyId, userId).first<Resident>();
+    if (byId) return byId;
+    const byEmail = await conn.prepare("SELECT * FROM residents WHERE society_id = ? AND email = ?")
+      .bind(societyId, userEmail.toLowerCase()).first<Resident>();
+    if (byEmail) {
+      await conn.prepare("UPDATE residents SET user_id = ? WHERE id = ?").bind(userId, byEmail.id).run();
+      return { ...byEmail, user_id: userId };
+    }
+    return null;
+  }
+  const store = mockStore();
+  const resident = store.residents.find((r) => r.society_id === societyId && r.user_id === userId)
+    ?? store.residents.find((r) => r.society_id === societyId && r.email?.toLowerCase() === userEmail.toLowerCase());
+  if (resident && !resident.user_id) resident.user_id = userId;
+  return resident ?? null;
 }
 
 /** Records that a user belongs to a society. Idempotent — joining twice is a no-op. */

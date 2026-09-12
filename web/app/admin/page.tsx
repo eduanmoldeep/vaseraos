@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui";
 import { NeedsSociety } from "@/components/NeedsSociety";
-import { getSelectedSociety } from "@/lib/society";
+import { useSelectedSociety } from "@/lib/society";
 
 type Summary = { residents: number; dues: number; openComplaints: number; activeVisitors: number };
 type Notice = { id: string; title: string; body: string };
@@ -20,7 +20,7 @@ const MODULES = [
 ];
 
 export default function Home() {
-  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
+  const society = useSelectedSociety();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [notices, setNotices] = useState<Notice[]>([]);
 
@@ -30,21 +30,9 @@ export default function Home() {
     fetch(`/api/notices?society=${id}`).then((r) => r.json()).then((d) => setNotices(d.slice(0, 3))).catch(() => {});
   };
   useEffect(() => {
-    const id = getSelectedSociety();
-    if (id) {
-      fetch(`/api/summary?society=${id}`)
-        .then((r) => r.json())
-        .then((data) => { if (data) setSummary(data); })
-        .catch(() => {});
-      fetch(`/api/notices?society=${id}`)
-        .then((r) => r.json())
-        .then((d) => { if (d) setNotices(d.slice(0, 3)); })
-        .catch(() => {});
-    }
-    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
-    window.addEventListener("vaseraos-society", onSwitch);
-    return () => window.removeEventListener("vaseraos-society", onSwitch);
-  }, []);
+    startTransition(() => load(society));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [society]);
 
   const stats = [
     { label: "Residents", value: summary?.residents ?? "—", dot: "bg-sky-500" },

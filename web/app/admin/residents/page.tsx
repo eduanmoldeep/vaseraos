@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { Badge, Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader, Select } from "@/components/ui";
 import { NeedsSociety } from "@/components/NeedsSociety";
 import type { Office, Resident } from "@/lib/cloudflare";
-import { getSelectedSociety } from "@/lib/society";
+import { getSelectedSociety, useSelectedSociety } from "@/lib/society";
 
 const OFFICES: { value: Office; label: string; tone: "blue" | "green" | "amber" }[] = [
   { value: "president", label: "President", tone: "blue" },
@@ -13,11 +13,11 @@ const OFFICES: { value: Office; label: string; tone: "blue" | "green" | "amber" 
 ];
 
 export default function ResidentsPage() {
-  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
+  const society = useSelectedSociety();
   const [rows, setRows] = useState<Resident[]>([]);
   const [offices, setOffices] = useState<Record<string, Office[]>>({});
-  const [form, setForm] = useState({ name: "", flat: "", phone: "", owner_tenant: "tenant" as "owner" | "tenant" });
-  const [loading, setLoading] = useState(() => !!getSelectedSociety());
+  const [form, setForm] = useState({ name: "", email: "", flat: "", phone: "", owner_tenant: "tenant" as "owner" | "tenant" });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingOfficeKey, setSavingOfficeKey] = useState<string | null>(null);
@@ -38,12 +38,9 @@ export default function ResidentsPage() {
       .finally(() => setLoading(false));
   };
   useEffect(() => {
-    load(getSelectedSociety());
-    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
-    window.addEventListener("vaseraos-society", onSwitch);
-    return () => window.removeEventListener("vaseraos-society", onSwitch);
+    startTransition(() => load(society));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [society]);
 
   async function toggleOffice(userId: string, office: Office) {
     const current = offices[userId] ?? [];
@@ -73,7 +70,7 @@ export default function ResidentsPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...form, society_id: getSelectedSociety() }),
       });
-      setForm({ name: "", flat: "", phone: "", owner_tenant: "tenant" });
+      setForm({ name: "", email: "", flat: "", phone: "", owner_tenant: "tenant" });
       load();
     } catch {
       setError("Couldn't add resident. Try again.");
@@ -101,8 +98,9 @@ export default function ResidentsPage() {
     <div>
       <PageHeader title="Residents" subtitle="Flats, owners, tenants & members." />
       <Card>
-        <form onSubmit={add} className="grid gap-3 sm:grid-cols-4">
+        <form onSubmit={add} className="grid gap-3 sm:grid-cols-3">
           <Input required placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <Input type="email" placeholder="Email (optional — links their account once they sign in)" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <Input required placeholder="Flat (e.g. A-101)" value={form.flat} onChange={(e) => setForm({ ...form, flat: e.target.value })} />
           <Input required placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <Select value={form.owner_tenant} onChange={(e) => setForm({ ...form, owner_tenant: e.target.value as "owner" | "tenant" })}>
@@ -123,7 +121,7 @@ export default function ResidentsPage() {
             <Card key={r.id} className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="font-medium">{r.name} <span className="text-zinc-500">· {r.flat}</span></p>
-                <p className="text-xs text-zinc-500">{r.phone} · {r.members} members</p>
+                <p className="text-xs text-zinc-500">{r.phone} · {r.members} members{r.email ? ` · ${r.email}` : ""}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={r.owner_tenant === "owner" ? "blue" : "amber"}>{r.owner_tenant === "owner" ? "Flat owner" : "Tenant"}</Badge>

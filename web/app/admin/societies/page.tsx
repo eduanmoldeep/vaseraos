@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader } from "@/components/ui";
 import type { Society } from "@/lib/cloudflare";
-import { getSelectedSociety, setSelectedSociety } from "@/lib/society";
+import { setSelectedSociety, useSelectedSociety } from "@/lib/society";
 
 type Counts = Record<string, { residents: number; dues: number; openComplaints: number; activeVisitors: number }>;
 
@@ -12,7 +12,7 @@ export default function SocietiesPage() {
   const [counts, setCounts] = useState<Counts>({});
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [form, setForm] = useState({ name: "", city: "" });
-  const [current, setCurrent] = useState<string | null>(() => getSelectedSociety());
+  const current = useSelectedSociety();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -43,26 +43,7 @@ export default function SocietiesPage() {
       .finally(() => setLoading(false));
   };
   useEffect(() => {
-    fetch("/api/societies")
-      .then((r) => r.json())
-      .then(async (list: Society[]) => {
-        setRows(list);
-        const entries = await Promise.all(
-          list
-            .filter((s) => s.status === "approved")
-            .map(async (s) => {
-              try {
-                const r = await fetch(`/api/summary?society=${s.id}`).then((x) => x.json());
-                return [s.id, r] as const;
-              } catch {
-                return [s.id, { residents: 0, dues: 0, openComplaints: 0, activeVisitors: 0 }] as const;
-              }
-            })
-        );
-        setCounts(Object.fromEntries(entries));
-      })
-      .catch(() => setError("Couldn't load societies."))
-      .finally(() => setLoading(false));
+    startTransition(() => load());
     fetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setIsPlatformAdmin(!!d?.user?.admin))
@@ -83,7 +64,6 @@ export default function SocietiesPage() {
       setForm({ name: "", city: "" });
       if (created?.id) {
         setSelectedSociety(created.id);
-        setCurrent(created.id);
       }
       load();
     } catch (err) {
@@ -112,14 +92,12 @@ export default function SocietiesPage() {
     await fetch(`/api/societies?id=${id}`, { method: "DELETE" });
     if (current === id) {
       setSelectedSociety(null);
-      setCurrent(null);
     }
     load();
   }
 
   function select(id: string) {
     setSelectedSociety(id);
-    setCurrent(id);
   }
 
   const pending = rows.filter((s) => s.status === "pending");

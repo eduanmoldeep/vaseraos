@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { Badge, Button, Card, Empty, ErrorBanner, ListSkeleton, PageHeader } from "@/components/ui";
 import type { HelpTicket } from "@/lib/cloudflare";
 
@@ -19,7 +19,9 @@ export default function SupportPage() {
       .catch(() => setError("Couldn't load tickets."))
       .finally(() => setLoading(false));
   };
-  useEffect(load, []);
+  useEffect(() => {
+    startTransition(load);
+  }, []);
 
   async function setStatus(id: string, status: "open" | "resolved") {
     setSavingId(id);

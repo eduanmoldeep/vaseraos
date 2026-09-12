@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { getSelectedSociety } from "@/lib/society";
+import { startTransition, useEffect, useRef, useState } from "react";
+import { useSelectedSociety } from "@/lib/society";
 
 type Notification = { id: string; title: string; body?: string | null; read_at?: string | null; created_at: string };
 
@@ -17,7 +17,7 @@ function timeAgo(iso: string): string {
 
 /** Bell with an unread count, polling every 30s. Dropdown lists recent notifications and marks them read on open. */
 export function NotificationBell() {
-  const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
+  const society = useSelectedSociety();
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
@@ -32,13 +32,11 @@ export function NotificationBell() {
   };
 
   useEffect(() => {
-    load();
-    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
-    window.addEventListener("vaseraos-society", onSwitch);
-    const interval = setInterval(() => load(), 30000);
-    return () => { window.removeEventListener("vaseraos-society", onSwitch); clearInterval(interval); };
+    startTransition(() => load(society));
+    const interval = setInterval(() => startTransition(() => load(society)), 30000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [society]);
 
   useEffect(() => {
     if (!open) return;
