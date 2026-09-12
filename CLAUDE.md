@@ -2,3 +2,4 @@ This repo is a monorepo: `web/` (Next.js + Cloudflare Workers) and `guardapp/` (
 Native guard app). Each has its own rules file — load whichever the current task touches:
 
 @web/AGENTS.md
+@guardapp/AGENTS.md
