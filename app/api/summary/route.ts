@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { DEFAULT_SOCIETY_ID, getEnv, mockStore } from "@/lib/cloudflare";
 import { requireAdmin, requireSocietyMember } from "@/lib/auth";
+import { ensureMaintenanceDue } from "@/lib/maintenance";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,7 @@ export async function GET(req: Request) {
   const scoped = society !== "all";
   const denied = scoped ? await requireSocietyMember(society) : await requireAdmin();
   if (denied) return denied;
+  if (scoped) await ensureMaintenanceDue(society);
   const env = await getEnv();
   if (env?.DB) {
     const where = (col = "society_id") => (scoped ? `WHERE ${col} = ?` : "");

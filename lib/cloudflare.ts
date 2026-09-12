@@ -76,6 +76,16 @@ export type Bill = {
   society_id: string;
 };
 
+/** How often dues are raised. Bills carry the current period's label in `Bill.month` — "2026-09", "2026-Q3" or "2026". */
+export type Cadence = "monthly" | "quarterly" | "yearly";
+export type MaintenanceSetting = {
+  society_id: string;
+  amount: number;
+  cadence: Cadence;
+  updated_by: string | null;
+  updated_at: string;
+};
+
 export type Complaint = {
   id: string;
   flat: string;
@@ -111,6 +121,7 @@ const g = globalThis as unknown as {
     auditLog: AuditEntry[];
     residents: Resident[];
     bills: Bill[];
+    maintenanceSettings: MaintenanceSetting[];
     complaints: Complaint[];
     visitors: Visitor[];
     notices: Notice[];
@@ -127,6 +138,7 @@ export function mockStore() {
       members: [],
       offices: [],
       auditLog: [],
+      maintenanceSettings: [],
       residents: [
         { id: "r1", name: "Aarav Sharma", flat: "A-101", phone: "98200 11111", email: "aarav@example.com", members: 4, owner_tenant: "owner", society_id: "s_default" },
         { id: "r2", name: "Meera Iyer", flat: "B-204", phone: "98200 22222", members: 3, owner_tenant: "tenant", society_id: "s_default" },

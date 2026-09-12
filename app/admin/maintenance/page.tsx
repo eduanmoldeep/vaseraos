@@ -3,16 +3,33 @@
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader, Select } from "@/components/ui";
 import { NeedsSociety } from "@/components/NeedsSociety";
-import type { Bill } from "@/lib/cloudflare";
+import type { Bill, Cadence, MaintenanceSetting } from "@/lib/cloudflare";
 import { getSelectedSociety } from "@/lib/society";
+
+const CADENCE_LABEL: Record<Cadence, string> = { monthly: "Monthly", quarterly: "Quarterly", yearly: "Yearly" };
 
 export default function MaintenancePage() {
   const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
   const [rows, setRows] = useState<Bill[]>([]);
+  const [setting, setSetting] = useState<MaintenanceSetting | null>(null);
+  const [settingForm, setSettingForm] = useState({ amount: "", cadence: "monthly" as Cadence });
+  const [settingError, setSettingError] = useState("");
+  const [savingSetting, setSavingSetting] = useState(false);
   const [form, setForm] = useState({ flat: "", amount: "", month: "2026-09" });
   const [loading, setLoading] = useState(() => !!getSelectedSociety());
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const loadSetting = (id: string | null) => {
+    if (!id) { setSetting(null); return; }
+    fetch(`/api/maintenance/settings?society=${id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: MaintenanceSetting | null) => {
+        setSetting(data ?? null);
+        if (data) setSettingForm({ amount: String(data.amount), cadence: data.cadence });
+      })
+      .catch(() => {});
+  };
 
   const load = (id: string | null = society) => {
     if (!id) { setRows([]); setLoading(false); return; }
@@ -32,11 +49,44 @@ export default function MaintenancePage() {
         .then((data) => { if (data) setRows(data); })
         .catch(() => setError("Couldn't load bills."))
         .finally(() => setLoading(false));
+      fetch(`/api/maintenance/settings?society=${id}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: MaintenanceSetting | null) => {
+          setSetting(data ?? null);
+          if (data) setSettingForm({ amount: String(data.amount), cadence: data.cadence });
+        })
+        .catch(() => {});
     }
-    const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
+    const onSwitch = (e: Event) => {
+      const next = (e as CustomEvent<string | null>).detail ?? null;
+      setSociety(next);
+      load(next);
+      loadSetting(next);
+    };
     window.addEventListener("vaseraos-society", onSwitch);
     return () => window.removeEventListener("vaseraos-society", onSwitch);
   }, []);
+
+  async function saveSetting(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingSetting(true);
+    setSettingError("");
+    try {
+      const res = await fetch("/api/maintenance/settings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ amount: Number(settingForm.amount), cadence: settingForm.cadence, society_id: getSelectedSociety() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { setSettingError(data?.error ?? "Couldn't save maintenance settings."); return; }
+      setSetting(data);
+      load();
+    } catch {
+      setSettingError("Couldn't save maintenance settings.");
+    } finally {
+      setSavingSetting(false);
+    }
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -85,7 +135,27 @@ export default function MaintenancePage() {
   return (
     <div>
       <PageHeader title="Maintenance" subtitle={loading ? "Bills, dues & collection." : `Outstanding collection: ₹${due.toLocaleString("en-IN")}`} />
+
       <Card>
+        <p className="text-sm font-medium">Recurring due (treasurer)</p>
+        <p className="mt-1 text-xs text-zinc-500">
+          {setting
+            ? `₹${setting.amount.toLocaleString("en-IN")} due every ${CADENCE_LABEL[setting.cadence].toLowerCase()} period — raised automatically for every flat.`
+            : "Not configured yet — every flat's due appears automatically once set."}
+        </p>
+        <form onSubmit={saveSetting} className="mt-3 grid gap-3 sm:grid-cols-3">
+          <Input required type="number" min="1" placeholder="Amount ₹" value={settingForm.amount} onChange={(e) => setSettingForm({ ...settingForm, amount: e.target.value })} />
+          <Select value={settingForm.cadence} onChange={(e) => setSettingForm({ ...settingForm, cadence: e.target.value as Cadence })}>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="yearly">Yearly</option>
+          </Select>
+          <Button busy={savingSetting} busyText="Saving…">Save</Button>
+        </form>
+        {settingError ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{settingError}</p> : null}
+      </Card>
+
+      <Card className="mt-4">
         <form onSubmit={add} className="grid gap-3 sm:grid-cols-4">
           <Input required placeholder="Flat" value={form.flat} onChange={(e) => setForm({ ...form, flat: e.target.value })} />
           <Input required type="number" min="0" placeholder="Amount ₹" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />

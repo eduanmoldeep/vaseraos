@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getEnv, mockStore, uid, DEFAULT_SOCIETY_ID, type Bill } from "@/lib/cloudflare";
 import { requireSocietyAdmin } from "@/lib/auth";
+import { ensureMaintenanceDue } from "@/lib/maintenance";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,7 @@ export async function GET(req: Request) {
   const society_id = new URL(req.url).searchParams.get("society") ?? DEFAULT_SOCIETY_ID;
   const denied = await requireSocietyAdmin(society_id);
   if (denied) return denied;
+  await ensureMaintenanceDue(society_id);
   const env = await getEnv();
   if (env?.DB) {
     const { results } = await env.DB.prepare("SELECT * FROM maintenance_bills WHERE society_id = ? ORDER BY month DESC")

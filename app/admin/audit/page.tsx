@@ -66,6 +66,7 @@ function describe(action: string): string {
     case "office.assign": return "updated offices for";
     case "membership.join": return "joined a society";
     case "society.register": return "registered a society";
+    case "maintenance.settings.update": return "updated maintenance settings for";
     default: return action;
   }
 }
