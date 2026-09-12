@@ -10,6 +10,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Workflow (must follow)
 
+This file governs the `web/` Next.js/Cloudflare app specifically — the repo root is now
+a monorepo (`web/` + `guardapp/`, see the root `CLAUDE.md`). All commands below assume
+`cwd: web/`.
+
 1. **Local first**: after any code change, run the build (`npx opennextjs-cloudflare build`) and show what changed (files + behavior) before any commit or deploy. Never deploy unbuilt/unshown work.
 2. **Local review URL**: after building, start the local dev server (`npm run dev`) and share the localhost URL so changes can be reviewed in a browser before any staging commit, push, or deploy. Keep it running until the review is done.
 2. **Staging first**: the first commit of any work goes to the `staging` branch. Never commit directly to `main`.
