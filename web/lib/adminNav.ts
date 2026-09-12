@@ -9,5 +9,6 @@ export const ADMIN_NAV = [
   { href: "/admin/notices", label: "Notices", dot: "bg-emerald-500", platformOnly: false },
   { href: "/admin/roles", label: "Roles", dot: "bg-fuchsia-500", platformOnly: false },
   { href: "/admin/users", label: "Users", dot: "bg-indigo-500", platformOnly: true },
+  { href: "/admin/support", label: "Support", dot: "bg-orange-500", platformOnly: true },
   { href: "/admin/audit", label: "Audit log", dot: "bg-slate-500", platformOnly: true },
 ] as const;

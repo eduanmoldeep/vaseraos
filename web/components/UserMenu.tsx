@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import type { AuthUser } from "@/lib/cloudflare";
 
 /** Top-right identity control: avatar initials + name, opens to show email and log out. */
@@ -50,6 +51,13 @@ export function UserMenu() {
             <p className="truncate text-xs text-zinc-500">{viewer.email}</p>
           </div>
           <div className="my-1 h-px bg-zinc-100 dark:bg-zinc-800" />
+          <Link
+            href="/help"
+            onClick={() => setOpen(false)}
+            className="block rounded-lg px-2 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            Help
+          </Link>
           <button
             onClick={logout}
             className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"

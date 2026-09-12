@@ -3,40 +3,66 @@
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader, Select } from "@/components/ui";
 import { NeedsSociety } from "@/components/NeedsSociety";
-import type { Resident } from "@/lib/cloudflare";
+import type { Office, Resident } from "@/lib/cloudflare";
 import { getSelectedSociety } from "@/lib/society";
+
+const OFFICES: { value: Office; label: string; tone: "blue" | "green" | "amber" }[] = [
+  { value: "president", label: "President", tone: "blue" },
+  { value: "secretary", label: "Secretary", tone: "green" },
+  { value: "treasurer", label: "Treasurer", tone: "amber" },
+];
 
 export default function ResidentsPage() {
   const [society, setSociety] = useState<string | null>(() => getSelectedSociety());
   const [rows, setRows] = useState<Resident[]>([]);
+  const [offices, setOffices] = useState<Record<string, Office[]>>({});
   const [form, setForm] = useState({ name: "", flat: "", phone: "", owner_tenant: "tenant" as "owner" | "tenant" });
   const [loading, setLoading] = useState(() => !!getSelectedSociety());
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [savingOfficeKey, setSavingOfficeKey] = useState<string | null>(null);
 
   const load = (id: string | null = society) => {
-    if (!id) { setRows([]); setLoading(false); return; }
+    if (!id) { setRows([]); setOffices({}); setLoading(false); return; }
     setLoading(true);
     setError("");
-    fetch(`/api/residents?society=${id}`)
-      .then((r) => r.json())
-      .then(setRows)
+    Promise.all([
+      fetch(`/api/residents?society=${id}`).then((r) => r.json()),
+      fetch(`/api/societies/offices?society=${id}`).then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([residentRows, officeRows]: [Resident[], { userId: string; offices: Office[] }[]]) => {
+        setRows(residentRows ?? []);
+        setOffices(Object.fromEntries((officeRows ?? []).map((o) => [o.userId, o.offices])));
+      })
       .catch(() => setError("Couldn't load residents."))
       .finally(() => setLoading(false));
   };
   useEffect(() => {
-    const id = getSelectedSociety();
-    if (id) {
-      fetch(`/api/residents?society=${id}`)
-        .then((r) => r.json())
-        .then((data) => { if (data) setRows(data); })
-        .catch(() => setError("Couldn't load residents."))
-        .finally(() => setLoading(false));
-    }
+    load(getSelectedSociety());
     const onSwitch = (e: Event) => { const next = (e as CustomEvent<string | null>).detail ?? null; setSociety(next); load(next); };
     window.addEventListener("vaseraos-society", onSwitch);
     return () => window.removeEventListener("vaseraos-society", onSwitch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function toggleOffice(userId: string, office: Office) {
+    const current = offices[userId] ?? [];
+    const next = current.includes(office) ? current.filter((o) => o !== office) : [...current, office];
+    const key = `${userId}:${office}`;
+    setSavingOfficeKey(key);
+    try {
+      await fetch("/api/societies/offices", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ society_id: society, userId, offices: next }),
+      });
+      setOffices((prev) => ({ ...prev, [userId]: next }));
+    } catch {
+      setError("Couldn't update that role. Try again.");
+    } finally {
+      setSavingOfficeKey(null);
+    }
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -99,8 +125,28 @@ export default function ResidentsPage() {
                 <p className="font-medium">{r.name} <span className="text-zinc-500">· {r.flat}</span></p>
                 <p className="text-xs text-zinc-500">{r.phone} · {r.members} members</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={r.owner_tenant === "owner" ? "blue" : "amber"}>{r.owner_tenant === "owner" ? "Flat owner" : "Tenant"}</Badge>
+                {r.user_id ? (
+                  OFFICES.map((o) => {
+                    const active = (offices[r.user_id!] ?? []).includes(o.value);
+                    const busy = savingOfficeKey === `${r.user_id}:${o.value}`;
+                    return (
+                      <button
+                        key={o.value}
+                        disabled={busy}
+                        onClick={() => toggleOffice(r.user_id!, o.value)}
+                        className="disabled:opacity-50"
+                        aria-pressed={active}
+                        aria-label={`${active ? "Remove" : "Assign"} ${o.label} for ${r.name}`}
+                      >
+                        <Badge tone={active ? o.tone : "zinc"}>{o.label}</Badge>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <span className="text-xs text-zinc-400">Not signed in yet</span>
+                )}
                 <Button variant="danger" size="sm" onClick={() => remove(r.id)} aria-label={`Remove resident ${r.name}`}>
                   Delete
                 </Button>

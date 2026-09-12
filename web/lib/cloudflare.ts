@@ -89,6 +89,17 @@ export type Notification = {
   created_at: string;
 };
 
+export type HelpTicket = {
+  id: string;
+  user_id: string;
+  society_id?: string | null;
+  subject: string;
+  message: string;
+  status: "open" | "resolved";
+  created_at: string;
+  resolved_at?: string | null;
+};
+
 export type Expense = {
   id: string;
   society_id: string;
@@ -174,6 +185,7 @@ const g = globalThis as unknown as {
     bills: Bill[];
     expenses: Expense[];
     notifications: Notification[];
+    helpTickets: HelpTicket[];
     maintenanceSettings: MaintenanceSetting[];
     complaints: Complaint[];
     visitors: Visitor[];
@@ -207,6 +219,7 @@ export function mockStore() {
       ],
       expenses: [],
       notifications: [],
+      helpTickets: [],
       complaints: [
         { id: "c1", flat: "B-204", title: "Lift not working in Block B", category: "maintenance", status: "in_progress", society_id: "s_default" },
         { id: "c2", flat: "A-101", title: "Water leakage in parking", category: "plumbing", status: "open", society_id: "s_default" },
