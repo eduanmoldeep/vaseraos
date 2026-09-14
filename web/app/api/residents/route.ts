@@ -34,15 +34,27 @@ export async function POST(req: Request) {
     owner_tenant: (body.owner_tenant === "owner" ? "owner" : "tenant") as "owner" | "tenant",
     society_id,
   };
+  const conflictError = NextResponse.json(
+    { error: `Flat ${resident.flat} already has a resident in this society.` },
+    { status: 409 }
+  );
+
   const env = await getEnv();
   if (env?.DB) {
-    await env.DB.prepare(
-      "INSERT INTO residents (id, name, flat, phone, email, members, owner_tenant, society_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    )
-      .bind(resident.id, resident.name, resident.flat, resident.phone, resident.email ?? null, resident.members, resident.owner_tenant, resident.society_id)
-      .run();
+    try {
+      await env.DB.prepare(
+        "INSERT INTO residents (id, name, flat, phone, email, members, owner_tenant, society_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+        .bind(resident.id, resident.name, resident.flat, resident.phone, resident.email ?? null, resident.members, resident.owner_tenant, resident.society_id)
+        .run();
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("UNIQUE")) return conflictError;
+      throw err;
+    }
   } else {
-    mockStore().residents.push(resident);
+    const store = mockStore();
+    if (store.residents.some((r) => r.society_id === resident.society_id && r.flat === resident.flat)) return conflictError;
+    store.residents.push(resident);
   }
   return NextResponse.json(resident, { status: 201 });
 }

@@ -75,6 +75,17 @@ export function UserMenu() {
           </Link>
           <div className="my-1 h-px bg-zinc-100 dark:bg-zinc-800" />
           <Link
+            href="/feedback"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M9 18h6M10 21h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.44 1 1.15 1 1.92V16h5v-.18c0-.77.4-1.48 1-1.92A6 6 0 0 0 12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            </svg>
+            Feature request
+          </Link>
+          <Link
             href="/help"
             onClick={() => setOpen(false)}
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"

@@ -89,12 +89,15 @@ export type Notification = {
   created_at: string;
 };
 
+export type HelpTicketCategory = "help" | "bug" | "feature" | "feedback";
+
 export type HelpTicket = {
   id: string;
   user_id: string;
   society_id?: string | null;
   subject: string;
   message: string;
+  category: HelpTicketCategory;
   status: "open" | "resolved";
   created_at: string;
   resolved_at?: string | null;

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { getEnv, mockStore, uid, type HelpTicket } from "@/lib/cloudflare";
+import { getEnv, mockStore, uid, type HelpTicket, type HelpTicketCategory } from "@/lib/cloudflare";
+
+const CATEGORIES: HelpTicketCategory[] = ["help", "bug", "feature", "feedback"];
 import { getViewer, requireAdmin } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -28,6 +30,7 @@ export async function POST(req: Request) {
   const subject = String(body.subject ?? "").trim();
   const message = String(body.message ?? "").trim();
   if (!subject || !message) return NextResponse.json({ error: "Provide a subject and a message." }, { status: 400 });
+  const category = CATEGORIES.includes(body.category) ? (body.category as HelpTicketCategory) : "help";
 
   const ticket: HelpTicket = {
     id: uid("h"),
@@ -35,6 +38,7 @@ export async function POST(req: Request) {
     society_id: body.society_id ? String(body.society_id) : null,
     subject,
     message,
+    category,
     status: "open",
     created_at: new Date().toISOString(),
     resolved_at: null,
@@ -42,8 +46,8 @@ export async function POST(req: Request) {
   const env = await getEnv();
   if (env?.DB) {
     await env.DB.prepare(
-      "INSERT INTO help_tickets (id, user_id, society_id, subject, message, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    ).bind(ticket.id, ticket.user_id, ticket.society_id, ticket.subject, ticket.message, ticket.status, ticket.created_at).run();
+      "INSERT INTO help_tickets (id, user_id, society_id, subject, message, category, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(ticket.id, ticket.user_id, ticket.society_id, ticket.subject, ticket.message, ticket.category, ticket.status, ticket.created_at).run();
   } else {
     mockStore().helpTickets.push(ticket);
   }
