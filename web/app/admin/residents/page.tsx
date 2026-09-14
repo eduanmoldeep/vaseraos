@@ -65,12 +65,15 @@ export default function ResidentsPage() {
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError("");
     try {
-      await fetch("/api/residents", {
+      const res = await fetch("/api/residents", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...form, society_id: getSelectedSociety() }),
       });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { setError(data?.error ?? "Couldn't add resident."); return; }
       setForm({ name: "", email: "", flat: "", phone: "", owner_tenant: "tenant" });
       load();
     } catch {

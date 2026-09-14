@@ -2,7 +2,20 @@
 
 import { startTransition, useEffect, useState } from "react";
 import { Badge, Button, Card, Empty, ErrorBanner, ListSkeleton, PageHeader } from "@/components/ui";
-import type { HelpTicket } from "@/lib/cloudflare";
+import type { HelpTicket, HelpTicketCategory } from "@/lib/cloudflare";
+
+const CATEGORY_TONE: Record<HelpTicketCategory, "zinc" | "red" | "blue" | "amber"> = {
+  help: "zinc",
+  bug: "red",
+  feature: "blue",
+  feedback: "amber",
+};
+const CATEGORY_LABEL: Record<HelpTicketCategory, string> = {
+  help: "Help",
+  bug: "Bug",
+  feature: "Feature",
+  feedback: "Feedback",
+};
 
 export default function SupportPage() {
   const [tickets, setTickets] = useState<HelpTicket[]>([]);
@@ -56,7 +69,10 @@ export default function SupportPage() {
               open.map((t) => (
                 <Card key={t.id} className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="font-medium">{t.subject}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{t.subject}</p>
+                      <Badge tone={CATEGORY_TONE[t.category]}>{CATEGORY_LABEL[t.category]}</Badge>
+                    </div>
                     <p className="mt-1 text-sm text-zinc-500">{t.message}</p>
                   </div>
                   <Button size="sm" busy={savingId === t.id} onClick={() => setStatus(t.id, "resolved")}>
@@ -74,7 +90,10 @@ export default function SupportPage() {
                 {resolved.map((t) => (
                   <Card key={t.id} className="flex flex-wrap items-center justify-between gap-3 opacity-70">
                     <div>
-                      <p className="font-medium">{t.subject}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{t.subject}</p>
+                        <Badge tone={CATEGORY_TONE[t.category]}>{CATEGORY_LABEL[t.category]}</Badge>
+                      </div>
                       <p className="mt-1 text-sm text-zinc-500">{t.message}</p>
                     </div>
                     <div className="flex items-center gap-2">
