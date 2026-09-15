@@ -6,10 +6,11 @@ import Link from "next/link";
 import { Badge, Button, Card, Empty, ErrorBanner, Input, PageHeader, Select } from "@/components/ui";
 import { NotificationBell } from "@/components/NotificationBell";
 import { UserMenu } from "@/components/UserMenu";
+import { ShareJoinCode } from "@/components/ShareJoinCode";
 import type { AuthUser } from "@/lib/cloudflare";
 import { setSelectedSociety } from "@/lib/society";
 
-type Membership = { societyId: string; name: string; status: string; offices: string[] };
+type Membership = { societyId: string; name: string; status: string; offices: string[]; join_code: string | null };
 type Summary = { residents: number; dues: number; openComplaints: number; activeVisitors: number };
 type Notice = { id: string; title: string; body: string };
 type Visitor = { id: string; name: string; flat: string; purpose: string; status: string };
@@ -171,7 +172,8 @@ export default function ResidentApp() {
             <h1 className="text-2xl font-semibold tracking-tight">{active?.name}</h1>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {active?.join_code ? <ShareJoinCode societyName={active.name} joinCode={active.join_code} /> : null}
           <NotificationBell />
           <UserMenu />
         </div>

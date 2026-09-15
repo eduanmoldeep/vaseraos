@@ -13,21 +13,22 @@ export async function GET() {
   if (memberships.length === 0) return NextResponse.json([]);
   const env = await getEnv();
   const ids = memberships.map((m) => m.societyId);
-  let names = new Map<string, { name: string; status: string }>();
+  let names = new Map<string, { name: string; status: string; join_code: string | null }>();
   if (env?.DB) {
     const placeholders = ids.map(() => "?").join(",");
-    const { results } = await env.DB.prepare(`SELECT id, name, status FROM societies WHERE id IN (${placeholders})`)
+    const { results } = await env.DB.prepare(`SELECT id, name, status, join_code FROM societies WHERE id IN (${placeholders})`)
       .bind(...ids)
-      .all<{ id: string; name: string; status: string }>();
-    names = new Map((results ?? []).map((r: { id: string; name: string; status: string }) => [r.id, { name: r.name, status: r.status }]));
+      .all<{ id: string; name: string; status: string; join_code: string | null }>();
+    names = new Map((results ?? []).map((r: { id: string; name: string; status: string; join_code: string | null }) => [r.id, { name: r.name, status: r.status, join_code: r.join_code }]));
   } else {
-    names = new Map(mockStore().societies.filter((s) => ids.includes(s.id)).map((s) => [s.id, { name: s.name, status: s.status }]));
+    names = new Map(mockStore().societies.filter((s) => ids.includes(s.id)).map((s) => [s.id, { name: s.name, status: s.status, join_code: s.join_code ?? null }]));
   }
   const rows = await Promise.all(
     memberships.map(async (m) => ({
       societyId: m.societyId,
       name: names.get(m.societyId)?.name ?? "Unknown",
       status: names.get(m.societyId)?.status ?? "approved",
+      join_code: names.get(m.societyId)?.join_code ?? null,
       offices: await getOffices(viewer.id, m.societyId),
     }))
   );

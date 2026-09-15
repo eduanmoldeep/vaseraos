@@ -2,6 +2,7 @@
 
 import { startTransition, useEffect, useState } from "react";
 import { Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader } from "@/components/ui";
+import { ShareJoinCode } from "@/components/ShareJoinCode";
 import type { Society } from "@/lib/cloudflare";
 import { setSelectedSociety, useSelectedSociety } from "@/lib/society";
 
@@ -189,6 +190,7 @@ export default function SocietiesPage() {
                       Generate join code
                     </Button>
                   ) : null}
+                  {s.join_code ? <ShareJoinCode societyName={s.name} joinCode={s.join_code} /> : null}
                   {s.id !== current ? (
                     <Button variant="secondary" size="sm" onClick={() => select(s.id)}>
                       Switch to
