@@ -1,7 +1,12 @@
 import { getEnv, mockStore, uid, type Notification } from "./cloudflare";
 import { getSocietyMembers } from "./membership";
+import { sendPushToUser } from "./push";
 
-/** Notifies every member of a society (excluding one user, e.g. the actor who caused it). */
+/**
+ * Notifies every member of a society (excluding one user, e.g. the actor who
+ * caused it) — writes the in-app notification and, best-effort, a Web Push to
+ * any device they've subscribed on. Push never blocks or fails this call.
+ */
 export async function notifySociety(societyId: string, title: string, body?: string, excludeUserId?: string): Promise<void> {
   const members = await getSocietyMembers(societyId);
   const userIds = members.map((m) => m.userId).filter((id) => id !== excludeUserId);
@@ -15,12 +20,13 @@ export async function notifySociety(societyId: string, title: string, body?: str
           .bind(uid("ntf"), userId, societyId, title, body ?? null, created_at)
       )
     );
-    return;
+  } else {
+    const store = mockStore();
+    for (const userId of userIds) {
+      store.notifications.push({ id: uid("ntf"), user_id: userId, society_id: societyId, title, body: body ?? null, created_at });
+    }
   }
-  const store = mockStore();
-  for (const userId of userIds) {
-    store.notifications.push({ id: uid("ntf"), user_id: userId, society_id: societyId, title, body: body ?? null, created_at });
-  }
+  await Promise.all(userIds.map((userId) => sendPushToUser(userId, title, body)));
 }
 
 export async function listNotifications(userId: string, societyId: string, limit = 20): Promise<Notification[]> {

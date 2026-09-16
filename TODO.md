@@ -30,8 +30,11 @@ build starts. Note: this is distinct from the UPI-QR-plus-screenshot-approval
 flow already shipped (`/dues`, `/admin/maintenance`) — that one never touches
 or holds funds, so it didn't need this.
 
-- [ ] Real push notifications (installed PWA / native) — payment reminders,
-      notice alerts, SOS status reach the phone even with the app closed.
+- [x] ~~Real push notifications (installed PWA / native)~~ — shipped: Web
+      Push (VAPID, `web/lib/push.ts`), toggle in the account dropdown, wired
+      into every `notifySociety()` call (notices, complaint/bill status,
+      etc.). iOS Safari only fires for an installed (Home Screen) PWA —
+      no onboarding nudge for that yet, worth adding if iPhone adoption is low.
 - [ ] QR/OTP visitor gate check-in — ties the visitor log to the guard app
       instead of being a manually-updated list.
 - [ ] Amenity/parking slot booking.

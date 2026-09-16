@@ -166,6 +166,9 @@ export type Guard = {
 export type GuardPlatform = "android" | "ios";
 export type GuardPushToken = { id: string; guard_id: string; platform: GuardPlatform; expo_token?: string | null; voip_token?: string | null };
 
+/** A resident/admin's browser Web Push subscription — separate from the guard app's Expo tokens above. */
+export type PushSubscriptionRow = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string; created_at: string };
+
 export type SosStatus = "open" | "acknowledged" | "resolved";
 export type SosAlert = {
   id: string;
@@ -197,6 +200,7 @@ const g = globalThis as unknown as {
     guards: (Guard & { password_hash: string })[];
     guardPushTokens: GuardPushToken[];
     sosAlerts: SosAlert[];
+    pushSubscriptions: PushSubscriptionRow[];
   };
 };
 
@@ -239,6 +243,7 @@ export function mockStore() {
       guards: [],
       guardPushTokens: [],
       sosAlerts: [],
+      pushSubscriptions: [],
     };
   }
   return g.__vasera;
