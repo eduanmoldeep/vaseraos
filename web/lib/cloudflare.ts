@@ -73,7 +73,7 @@ export type Bill = {
   flat: string;
   amount: number;
   month: string;
-  status: "pending" | "paid" | "overdue";
+  status: "pending" | "pending_verification" | "paid" | "overdue";
   society_id: string;
   receipt_key?: string | null;
   paid_at?: string | null;
@@ -121,6 +121,7 @@ export type MaintenanceSetting = {
   society_id: string;
   amount: number;
   cadence: Cadence;
+  upi_id: string | null;
   updated_by: string | null;
   updated_at: string;
 };

@@ -1,13 +1,35 @@
 import { NextResponse } from "next/server";
 import { getEnv, mockStore, uid, DEFAULT_SOCIETY_ID, type Bill } from "@/lib/cloudflare";
-import { requireSocietyAdmin, requireSocietyOffice } from "@/lib/auth";
+import { getViewer, requireSocietyAdmin, requireSocietyMember, requireSocietyOffice } from "@/lib/auth";
+import { getMyFlat } from "@/lib/membership";
 import { ensureMaintenanceDue } from "@/lib/maintenance";
 import { storeReceipt } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 
+/** Admins see every bill; `?mine=1` scopes a member to just their own flat's bills. */
 export async function GET(req: Request) {
-  const society_id = new URL(req.url).searchParams.get("society") ?? DEFAULT_SOCIETY_ID;
+  const url = new URL(req.url);
+  const society_id = url.searchParams.get("society") ?? DEFAULT_SOCIETY_ID;
+  const mine = url.searchParams.get("mine") === "1";
+
+  if (mine) {
+    const denied = await requireSocietyMember(society_id);
+    if (denied) return denied;
+    const viewer = (await getViewer())!;
+    const flat = await getMyFlat(viewer.id, viewer.email, society_id);
+    if (!flat) return NextResponse.json([]);
+    await ensureMaintenanceDue(society_id);
+    const env = await getEnv();
+    if (env?.DB) {
+      const { results } = await env.DB.prepare("SELECT * FROM maintenance_bills WHERE society_id = ? AND flat = ? ORDER BY month DESC")
+        .bind(society_id, flat)
+        .all();
+      return NextResponse.json(results);
+    }
+    return NextResponse.json(mockStore().bills.filter((b) => b.society_id === society_id && b.flat === flat));
+  }
+
   const denied = await requireSocietyAdmin(society_id);
   if (denied) return denied;
   await ensureMaintenanceDue(society_id);
@@ -47,9 +69,17 @@ export async function POST(req: Request) {
   return NextResponse.json(bill, { status: 201 });
 }
 
-const BILL_STATUSES = ["pending", "paid", "overdue"] as const;
+const BILL_STATUSES = ["pending", "pending_verification", "paid", "overdue"] as const;
 
-/** Accepts JSON ({id, status}) or multipart/form-data (same fields, plus an optional `receipt` file — for marking a bill paid with a payment proof). */
+/**
+ * Accepts JSON ({id, status}) or multipart/form-data (same fields, plus an optional
+ * `receipt` file). Two paths:
+ * - status "pending_verification": self-service — a resident submitting UPI payment
+ *   proof for their OWN bill. No admin rights needed, but a screenshot is required.
+ * - any other status: the existing treasurer/admin path (approve → paid, reject →
+ *   back to pending and the unverified screenshot is cleared, or raw pending/overdue
+ *   bookkeeping). Optional receipt replaces the stored one.
+ */
 export async function PATCH(req: Request) {
   const isMultipart = (req.headers.get("content-type") ?? "").includes("multipart/form-data");
   let id: string, status: string, receiptFile: File | null = null;
@@ -66,10 +96,46 @@ export async function PATCH(req: Request) {
     status = String(body.status ?? "");
   }
   if (!id || !BILL_STATUSES.includes(status as (typeof BILL_STATUSES)[number])) {
-    return NextResponse.json({ error: "Provide id and valid status: pending | paid | overdue" }, { status: 400 });
+    return NextResponse.json({ error: "Provide id and valid status: pending | pending_verification | paid | overdue" }, { status: 400 });
   }
 
   const env = await getEnv();
+
+  if (status === "pending_verification") {
+    if (!receiptFile || receiptFile.size === 0) {
+      return NextResponse.json({ error: "Upload a screenshot of the payment." }, { status: 400 });
+    }
+    const findBill = env?.DB
+      ? await env.DB.prepare("SELECT * FROM maintenance_bills WHERE id = ?").bind(id).first<Bill>()
+      : mockStore().bills.find((b) => b.id === id);
+    if (!findBill) return NextResponse.json({ error: "Bill not found" }, { status: 404 });
+    const denied = await requireSocietyMember(findBill.society_id);
+    if (denied) return denied;
+    const viewer = (await getViewer())!;
+    const myFlat = await getMyFlat(viewer.id, viewer.email, findBill.society_id);
+    if (myFlat !== findBill.flat) {
+      return NextResponse.json({ error: "That's not your bill." }, { status: 403 });
+    }
+    let receipt_key: string | undefined;
+    try {
+      receipt_key = await storeReceipt(findBill.society_id, receiptFile);
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : "Couldn't store the screenshot." }, { status: 400 });
+    }
+    if (env?.DB) {
+      await env.DB.prepare("UPDATE maintenance_bills SET status = 'pending_verification', receipt_key = ? WHERE id = ?")
+        .bind(receipt_key ?? null, id)
+        .run();
+      const updated = await env.DB.prepare("SELECT * FROM maintenance_bills WHERE id = ?").bind(id).first();
+      return NextResponse.json(updated);
+    }
+    const bill = mockStore().bills.find((b) => b.id === id)!;
+    bill.status = "pending_verification";
+    bill.receipt_key = receipt_key ?? bill.receipt_key;
+    return NextResponse.json(bill);
+  }
+
+  // Treasurer/admin path: approve (paid), reject (pending — clears the screenshot), or raw bookkeeping.
   if (env?.DB) {
     const row = await env.DB.prepare("SELECT society_id FROM maintenance_bills WHERE id = ?").bind(id).first<{ society_id: string }>();
     if (!row) return NextResponse.json({ error: "Bill not found" }, { status: 404 });
@@ -82,8 +148,10 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: err instanceof Error ? err.message : "Couldn't store receipt." }, { status: 400 });
     }
     const paid_at = status === "paid" ? new Date().toISOString() : null;
-    await env.DB.prepare("UPDATE maintenance_bills SET status = ?, paid_at = ?, receipt_key = COALESCE(?, receipt_key) WHERE id = ?")
-      .bind(status, paid_at, receipt_key ?? null, id)
+    const receiptExpr = status === "pending" ? "NULL" : "COALESCE(?, receipt_key)";
+    const bindings = status === "pending" ? [status, paid_at, id] : [status, paid_at, receipt_key ?? null, id];
+    await env.DB.prepare(`UPDATE maintenance_bills SET status = ?, paid_at = ?, receipt_key = ${receiptExpr} WHERE id = ?`)
+      .bind(...bindings)
       .run();
     const updated = await env.DB.prepare("SELECT * FROM maintenance_bills WHERE id = ?").bind(id).first();
     return NextResponse.json(updated);
@@ -94,6 +162,7 @@ export async function PATCH(req: Request) {
   if (denied) return denied;
   bill.status = status as Bill["status"];
   bill.paid_at = status === "paid" ? new Date().toISOString() : null;
+  if (status === "pending") bill.receipt_key = null;
   return NextResponse.json(bill);
 }
 

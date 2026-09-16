@@ -28,14 +28,19 @@ export async function POST(req: Request) {
   if (!CADENCES.includes(cadence)) {
     return NextResponse.json({ error: "Cadence must be monthly, quarterly or yearly." }, { status: 400 });
   }
+  const upiIdRaw = String(body.upi_id ?? "").trim();
+  if (upiIdRaw && !/^[\w.+-]{2,256}@[a-zA-Z][\w.-]{1,64}$/.test(upiIdRaw)) {
+    return NextResponse.json({ error: "That doesn't look like a valid UPI ID (e.g. name@bank)." }, { status: 400 });
+  }
+  const upi_id = upiIdRaw || null;
   const viewer = await getViewer();
-  const setting = await setMaintenanceSetting(society_id, amount, cadence, viewer!.id);
+  const setting = await setMaintenanceSetting(society_id, amount, cadence, viewer!.id, upi_id);
   await ensureMaintenanceDue(society_id);
   await logAudit({
     actorId: viewer!.id,
     action: "maintenance.settings.update",
     societyId: society_id,
-    detail: `₹${amount} ${cadence}`,
+    detail: `₹${amount} ${cadence}${upi_id ? ` · UPI ${upi_id}` : ""}`,
     ip: getRequestIp(req),
   });
   return NextResponse.json(setting);

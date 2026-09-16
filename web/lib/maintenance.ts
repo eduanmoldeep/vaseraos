@@ -25,29 +25,30 @@ export async function getMaintenanceSetting(societyId: string): Promise<Maintena
   return mockStore().maintenanceSettings.find((s) => s.society_id === societyId);
 }
 
-/** Treasurer-set config: amount due and how often. Upsert — one row per society. */
-export async function setMaintenanceSetting(societyId: string, amount: number, cadence: Cadence, updatedBy: string): Promise<MaintenanceSetting> {
+/** Treasurer-set config: amount due, how often, and (optionally) the UPI ID residents pay to. Upsert — one row per society. */
+export async function setMaintenanceSetting(societyId: string, amount: number, cadence: Cadence, updatedBy: string, upiId: string | null): Promise<MaintenanceSetting> {
   const updated_at = new Date().toISOString();
   const env = await getEnv();
   const conn = await db(env);
   if (conn) {
     await conn.prepare(
-      `INSERT INTO maintenance_settings (society_id, amount, cadence, updated_by, updated_at) VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT (society_id) DO UPDATE SET amount = excluded.amount, cadence = excluded.cadence, updated_by = excluded.updated_by, updated_at = excluded.updated_at`
-    ).bind(societyId, amount, cadence, updatedBy, updated_at).run();
+      `INSERT INTO maintenance_settings (society_id, amount, cadence, upi_id, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (society_id) DO UPDATE SET amount = excluded.amount, cadence = excluded.cadence, upi_id = excluded.upi_id, updated_by = excluded.updated_by, updated_at = excluded.updated_at`
+    ).bind(societyId, amount, cadence, upiId, updatedBy, updated_at).run();
   } else {
     const store = mockStore();
     const existing = store.maintenanceSettings.find((s) => s.society_id === societyId);
     if (existing) {
       existing.amount = amount;
       existing.cadence = cadence;
+      existing.upi_id = upiId;
       existing.updated_by = updatedBy;
       existing.updated_at = updated_at;
     } else {
-      store.maintenanceSettings.push({ society_id: societyId, amount, cadence, updated_by: updatedBy, updated_at });
+      store.maintenanceSettings.push({ society_id: societyId, amount, cadence, upi_id: upiId, updated_by: updatedBy, updated_at });
     }
   }
-  return { society_id: societyId, amount, cadence, updated_by: updatedBy, updated_at };
+  return { society_id: societyId, amount, cadence, upi_id: upiId, updated_by: updatedBy, updated_at };
 }
 
 /**

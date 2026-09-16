@@ -21,6 +21,24 @@ Full plan: `.claude/plans/pure-scribbling-twilight.md` (guard panic-alarm featur
 - [ ] Backend: sign+send the iOS VoIP push via direct APNs call (Web Crypto ES256
       JWT) once the `.p8`/Team ID/Key ID above are available.
 
+## Future feature ideas (tracked, not started)
+
+Real online maintenance payment (payment gateway — Razorpay/PayU/etc., money
+actually flows through the platform) — **deferred**: needs legal/compliance
+work first (payment aggregator agreement, KYC, RBI guidelines) before any
+build starts. Note: this is distinct from the UPI-QR-plus-screenshot-approval
+flow already shipped (`/dues`, `/admin/maintenance`) — that one never touches
+or holds funds, so it didn't need this.
+
+- [ ] Real push notifications (installed PWA / native) — payment reminders,
+      notice alerts, SOS status reach the phone even with the app closed.
+- [ ] QR/OTP visitor gate check-in — ties the visitor log to the guard app
+      instead of being a manually-updated list.
+- [ ] Amenity/parking slot booking.
+- [ ] AGM polls / voting for society governance decisions.
+- [ ] Document vault — bylaws, AGM minutes, agreements, shared per society.
+- [ ] Ledger/dues export (PDF/CSV) for office bearers' own records/AGM use.
+
 ## Smaller follow-ups
 
 - [ ] `guardapp/`: wire EAS build profiles (staging vs prod `EXPO_PUBLIC_API_BASE_URL`)

@@ -12,7 +12,7 @@ export default function MaintenancePage() {
   const society = useSelectedSociety();
   const [rows, setRows] = useState<Bill[]>([]);
   const [setting, setSetting] = useState<MaintenanceSetting | null>(null);
-  const [settingForm, setSettingForm] = useState({ amount: "", cadence: "monthly" as Cadence });
+  const [settingForm, setSettingForm] = useState({ amount: "", cadence: "monthly" as Cadence, upi_id: "" });
   const [settingError, setSettingError] = useState("");
   const [savingSetting, setSavingSetting] = useState(false);
   const [form, setForm] = useState({ flat: "", amount: "", month: "2026-09" });
@@ -27,7 +27,7 @@ export default function MaintenancePage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data: MaintenanceSetting | null) => {
         setSetting(data ?? null);
-        if (data) setSettingForm({ amount: String(data.amount), cadence: data.cadence });
+        if (data) setSettingForm({ amount: String(data.amount), cadence: data.cadence, upi_id: data.upi_id ?? "" });
       })
       .catch(() => {});
   };
@@ -55,7 +55,7 @@ export default function MaintenancePage() {
       const res = await fetch("/api/maintenance/settings", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ amount: Number(settingForm.amount), cadence: settingForm.cadence, society_id: getSelectedSociety() }),
+        body: JSON.stringify({ amount: Number(settingForm.amount), cadence: settingForm.cadence, upi_id: settingForm.upi_id, society_id: getSelectedSociety() }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) { setSettingError(data?.error ?? "Couldn't save maintenance settings."); return; }
@@ -137,16 +137,22 @@ export default function MaintenancePage() {
             ? `₹${setting.amount.toLocaleString("en-IN")} due every ${CADENCE_LABEL[setting.cadence].toLowerCase()} period — raised automatically for every flat.`
             : "Not configured yet — every flat's due appears automatically once set."}
         </p>
-        <form onSubmit={saveSetting} className="mt-3 grid gap-3 sm:grid-cols-3">
+        <form onSubmit={saveSetting} className="mt-3 grid gap-3 sm:grid-cols-2">
           <Input required type="number" min="1" placeholder="Amount ₹" value={settingForm.amount} onChange={(e) => setSettingForm({ ...settingForm, amount: e.target.value })} />
           <Select value={settingForm.cadence} onChange={(e) => setSettingForm({ ...settingForm, cadence: e.target.value as Cadence })}>
             <option value="monthly">Monthly</option>
             <option value="quarterly">Quarterly</option>
             <option value="yearly">Yearly</option>
           </Select>
-          <Button busy={savingSetting} busyText="Saving…">Save</Button>
+          <Input
+            placeholder="UPI ID (e.g. society@bank) — optional, lets residents pay by QR"
+            value={settingForm.upi_id}
+            onChange={(e) => setSettingForm({ ...settingForm, upi_id: e.target.value })}
+            className="sm:col-span-2"
+          />
+          <Button busy={savingSetting} busyText="Saving…" className="w-fit">Save</Button>
         </form>
-        {settingError ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{settingError}</p> : null}
+        {settingError ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{settingError}</p> : null}
       </Card>
 
       <Card className="mt-4">
@@ -172,8 +178,20 @@ export default function MaintenancePage() {
                 <p className="text-sm">₹{b.amount.toLocaleString("en-IN")}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone={b.status === "paid" ? "green" : b.status === "overdue" ? "red" : "amber"}>{b.status}</Badge>
-                {b.status === "paid" ? (
+                <Badge tone={b.status === "paid" ? "green" : b.status === "pending_verification" ? "blue" : b.status === "overdue" ? "red" : "amber"}>
+                  {b.status === "pending_verification" ? "awaiting approval" : b.status}
+                </Badge>
+                {b.status === "pending_verification" ? (
+                  <>
+                    {b.receipt_key ? (
+                      <a href={`/api/uploads/${b.receipt_key}`} target="_blank" rel="noreferrer" className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                        View screenshot
+                      </a>
+                    ) : null}
+                    <Button variant="secondary" size="sm" onClick={() => setStatus(b.id, "pending")}>Reject</Button>
+                    <Button size="sm" onClick={() => setStatus(b.id, "paid")}>Approve</Button>
+                  </>
+                ) : b.status === "paid" ? (
                   <>
                     <Select
                       value={b.status}
