@@ -167,6 +167,28 @@ export type Guard = {
 export type GuardPlatform = "android" | "ios";
 export type GuardPushToken = { id: string; guard_id: string; platform: GuardPlatform; expo_token?: string | null; voip_token?: string | null };
 
+/** Office-bearer-set monthly salary for one guard. One row per guard, upserted. */
+export type GuardSalaryConfig = {
+  guard_id: string;
+  society_id: string;
+  monthly_amount: number;
+  updated_by: string | null;
+  updated_at: string;
+};
+
+/** One logged salary payment — may be a partial/early payment against the period, so several rows can share a (guard_id, period). */
+export type GuardSalaryPayment = {
+  id: string;
+  guard_id: string;
+  society_id: string;
+  amount: number;
+  period: string;
+  early: boolean;
+  note: string | null;
+  paid_by: string | null;
+  created_at: string;
+};
+
 /** A resident/admin's browser Web Push subscription — separate from the guard app's Expo tokens above. */
 export type PushSubscriptionRow = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string; created_at: string };
 
@@ -200,6 +222,8 @@ const g = globalThis as unknown as {
     notices: Notice[];
     guards: (Guard & { password_hash: string })[];
     guardPushTokens: GuardPushToken[];
+    guardSalaryConfig: GuardSalaryConfig[];
+    guardSalaryPayments: GuardSalaryPayment[];
     sosAlerts: SosAlert[];
     pushSubscriptions: PushSubscriptionRow[];
   };
@@ -243,6 +267,8 @@ export function mockStore() {
       ],
       guards: [],
       guardPushTokens: [],
+      guardSalaryConfig: [],
+      guardSalaryPayments: [],
       sosAlerts: [],
       pushSubscriptions: [],
     };

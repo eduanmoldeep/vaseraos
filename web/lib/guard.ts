@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hashPassword, verifyPassword } from "./auth";
-import { getEnv, mockStore, uid, type Env, type Guard, type GuardPlatform } from "./cloudflare";
+import { getEnv, mockStore, uid, type Env, type Guard, type GuardPlatform, type GuardSalaryConfig, type GuardSalaryPayment } from "./cloudflare";
 
 async function db(env: Env | null) {
   return env?.DB ?? null;
@@ -170,6 +170,94 @@ export async function registerPushToken(guardId: string, platform: GuardPlatform
   } else {
     store.guardPushTokens.push({ id: uid("gpt"), guard_id: guardId, platform, expo_token: expoToken ?? null, voip_token: voipToken ?? null });
   }
+}
+
+// ---- Salary: office-bearer-set monthly amount per guard, plus a payment log ----
+// (payments may be partial/early — a guard asking for urgency cash mid-period logs
+// fine against the same period as later top-ups).
+export async function getGuardSalaryConfig(guardId: string): Promise<GuardSalaryConfig | undefined> {
+  const env = await getEnv();
+  const conn = await db(env);
+  if (conn) {
+    const row = await conn.prepare("SELECT * FROM guard_salary_config WHERE guard_id = ?").bind(guardId).first<GuardSalaryConfig>();
+    return row ?? undefined;
+  }
+  return mockStore().guardSalaryConfig.find((c) => c.guard_id === guardId);
+}
+
+export async function listGuardSalaryConfig(societyId: string): Promise<GuardSalaryConfig[]> {
+  const env = await getEnv();
+  const conn = await db(env);
+  if (conn) {
+    const { results } = await conn.prepare("SELECT * FROM guard_salary_config WHERE society_id = ?").bind(societyId).all<GuardSalaryConfig>();
+    return results ?? [];
+  }
+  return mockStore().guardSalaryConfig.filter((c) => c.society_id === societyId);
+}
+
+/** Upsert — one row per guard. */
+export async function setGuardSalaryConfig(guardId: string, societyId: string, monthlyAmount: number, updatedBy: string): Promise<GuardSalaryConfig> {
+  const updated_at = new Date().toISOString();
+  const env = await getEnv();
+  const conn = await db(env);
+  if (conn) {
+    await conn.prepare(
+      `INSERT INTO guard_salary_config (guard_id, society_id, monthly_amount, updated_by, updated_at) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (guard_id) DO UPDATE SET monthly_amount = excluded.monthly_amount, updated_by = excluded.updated_by, updated_at = excluded.updated_at`
+    ).bind(guardId, societyId, monthlyAmount, updatedBy, updated_at).run();
+  } else {
+    const store = mockStore();
+    const existing = store.guardSalaryConfig.find((c) => c.guard_id === guardId);
+    if (existing) {
+      existing.monthly_amount = monthlyAmount;
+      existing.updated_by = updatedBy;
+      existing.updated_at = updated_at;
+    } else {
+      store.guardSalaryConfig.push({ guard_id: guardId, society_id: societyId, monthly_amount: monthlyAmount, updated_by: updatedBy, updated_at });
+    }
+  }
+  return { guard_id: guardId, society_id: societyId, monthly_amount: monthlyAmount, updated_by: updatedBy, updated_at };
+}
+
+export async function listGuardSalaryPayments(societyId: string, guardId?: string): Promise<GuardSalaryPayment[]> {
+  const env = await getEnv();
+  const conn = await db(env);
+  if (conn) {
+    const { results } = guardId
+      ? await conn.prepare("SELECT * FROM guard_salary_payments WHERE society_id = ? AND guard_id = ? ORDER BY created_at DESC")
+          .bind(societyId, guardId).all<Omit<GuardSalaryPayment, "early"> & { early: number }>()
+      : await conn.prepare("SELECT * FROM guard_salary_payments WHERE society_id = ? ORDER BY created_at DESC")
+          .bind(societyId).all<Omit<GuardSalaryPayment, "early"> & { early: number }>();
+    return (results ?? []).map((r: Omit<GuardSalaryPayment, "early"> & { early: number }) => ({ ...r, early: !!r.early }));
+  }
+  return mockStore().guardSalaryPayments
+    .filter((p) => p.society_id === societyId && (!guardId || p.guard_id === guardId))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** Logs one salary payment — full, partial, or early (urgency). `early` just tags it for reporting; nothing blocks a partial or ahead-of-cycle payment. */
+export async function logGuardSalaryPayment(guardId: string, societyId: string, amount: number, period: string, early: boolean, note: string | undefined, paidBy: string): Promise<GuardSalaryPayment> {
+  const payment: GuardSalaryPayment = {
+    id: uid("gsp"),
+    guard_id: guardId,
+    society_id: societyId,
+    amount,
+    period,
+    early,
+    note: note?.trim() || null,
+    paid_by: paidBy,
+    created_at: new Date().toISOString(),
+  };
+  const env = await getEnv();
+  const conn = await db(env);
+  if (conn) {
+    await conn.prepare(
+      "INSERT INTO guard_salary_payments (id, guard_id, society_id, amount, period, early, note, paid_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(payment.id, payment.guard_id, payment.society_id, payment.amount, payment.period, payment.early ? 1 : 0, payment.note, payment.paid_by, payment.created_at).run();
+  } else {
+    mockStore().guardSalaryPayments.push(payment);
+  }
+  return payment;
 }
 
 export async function getGuardPushTokens(societyId: string): Promise<{ platform: GuardPlatform; expo_token: string | null; voip_token: string | null }[]> {
