@@ -41,6 +41,11 @@ or holds funds, so it didn't need this.
 - [ ] AGM polls / voting for society governance decisions.
 - [ ] Document vault — bylaws, AGM minutes, agreements, shared per society.
 - [ ] Ledger/dues export (PDF/CSV) for office bearers' own records/AGM use.
+- [ ] Vendor/staff directory — plumber, electrician, security agency contacts per society.
+- [ ] Complaint SLA tracking — auto-escalate to admin if unresolved past 30 days
+      (needs Cloudflare Cron Trigger).
+- [ ] Bulk resident import (CSV) for onboarding an existing society.
+- [ ] Audit log — who approved what bill/complaint/notice, for AGM accountability.
 
 ## Smaller follow-ups
 
