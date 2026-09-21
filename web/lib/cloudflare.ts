@@ -113,6 +113,8 @@ export type Expense = {
   description?: string | null;
   receipt_key?: string | null;
   created_by?: string | null;
+  /** Set when this expense was auto-logged from a guard salary payment, rather than entered by hand. */
+  guard_salary_payment_id?: string | null;
   created_at: string;
 };
 

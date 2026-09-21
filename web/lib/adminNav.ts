@@ -3,6 +3,7 @@ export const ADMIN_NAV = [
   { href: "/admin/societies", label: "Societies", dot: "bg-teal-500", platformOnly: true },
   { href: "/admin/residents", label: "Residents", dot: "bg-sky-500", platformOnly: false },
   { href: "/admin/maintenance", label: "Maintenance", dot: "bg-amber-500", platformOnly: false },
+  { href: "/admin/ledger", label: "Ledger", dot: "bg-lime-500", platformOnly: false },
   { href: "/admin/complaints", label: "Complaints", dot: "bg-rose-500", platformOnly: false },
   { href: "/admin/visitors", label: "Visitors", dot: "bg-violet-500", platformOnly: false },
   { href: "/admin/guards", label: "Guards", dot: "bg-cyan-500", platformOnly: false },

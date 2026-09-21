@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hashPassword, verifyPassword } from "./auth";
 import { getEnv, mockStore, uid, type Env, type Guard, type GuardPlatform, type GuardSalaryConfig, type GuardSalaryPayment } from "./cloudflare";
+import { createExpense } from "./expenses";
 
 async function db(env: Env | null) {
   return env?.DB ?? null;
@@ -235,7 +236,13 @@ export async function listGuardSalaryPayments(societyId: string, guardId?: strin
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
-/** Logs one salary payment — full, partial, or early (urgency). `early` just tags it for reporting; nothing blocks a partial or ahead-of-cycle payment. */
+/**
+ * Logs one salary payment — full, partial, or early (urgency). `early` just
+ * tags it for reporting; nothing blocks a partial or ahead-of-cycle payment.
+ * Also drops a matching "staff" expense into the society ledger, so paid
+ * salary (early ones especially — money that went out ahead of the normal
+ * cycle) shows up in Spent/balance without the office bearer re-entering it.
+ */
 export async function logGuardSalaryPayment(guardId: string, societyId: string, amount: number, period: string, early: boolean, note: string | undefined, paidBy: string): Promise<GuardSalaryPayment> {
   const payment: GuardSalaryPayment = {
     id: uid("gsp"),
@@ -257,6 +264,18 @@ export async function logGuardSalaryPayment(guardId: string, societyId: string, 
   } else {
     mockStore().guardSalaryPayments.push(payment);
   }
+
+  const guard = await findGuardById(env, guardId);
+  await createExpense({
+    societyId,
+    category: "staff",
+    vendor: guard?.name ?? "Guard salary",
+    amount,
+    description: `Salary — ${period}${early ? ` · early/partial${payment.note ? `: ${payment.note}` : ""}` : ""}`,
+    createdBy: paidBy,
+    guardSalaryPaymentId: payment.id,
+  });
+
   return payment;
 }
 
