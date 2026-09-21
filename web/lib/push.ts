@@ -79,10 +79,16 @@ export async function sendPushToUser(userId: string, title: string, body?: strin
   const env = await getEnv();
   const publicKey = env?.VAPID_PUBLIC_KEY;
   const privateKey = env?.VAPID_PRIVATE_KEY;
-  if (!publicKey || !privateKey) return; // not configured — silently skip, in-app notification still lands
+  if (!publicKey || !privateKey) {
+    console.warn(`[push] skipped for user ${userId}: VAPID keys not configured in this environment`);
+    return; // in-app notification still lands
+  }
 
   const subs = await getSubscriptionsForUser(userId);
-  if (subs.length === 0) return;
+  if (subs.length === 0) {
+    console.log(`[push] skipped for user ${userId}: no subscriptions on file`);
+    return;
+  }
 
   const vapid = { subject: "mailto:support@vaseraos.com", publicKey, privateKey };
 
@@ -96,9 +102,16 @@ export async function sendPushToUser(userId: string, title: string, body?: strin
       try {
         const payload = await buildPushPayload({ data: { title, body: body ?? null, url } }, subscription, vapid);
         const res = await fetch(subscription.endpoint, { method: payload.method, headers: payload.headers, body: payload.body });
-        if (res.status === 404 || res.status === 410) await removePushSubscription(s.endpoint);
-      } catch {
-        // network/encryption failure for this one device — skip, don't fail the batch
+        if (res.status === 404 || res.status === 410) {
+          console.warn(`[push] dead subscription for user ${userId} (status ${res.status}) — removing`);
+          await removePushSubscription(s.endpoint);
+        } else if (!res.ok) {
+          console.error(`[push] send failed for user ${userId}: ${res.status} ${await res.text().catch(() => "")}`);
+        } else {
+          console.log(`[push] sent to user ${userId}`);
+        }
+      } catch (err) {
+        console.error(`[push] error sending to user ${userId}:`, err instanceof Error ? err.message : err);
       }
     })
   );

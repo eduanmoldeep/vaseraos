@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     mockStore().notices.push(notice);
   }
   const viewer = await getViewer();
-  await notifySociety(society_id, `New notice: ${notice.title}`, notice.body.slice(0, 140), viewer?.id);
+  await notifySociety(society_id, `New notice: ${notice.title}`, notice.body.slice(0, 140), viewer?.id, `/notices#n_${notice.id}`);
   return NextResponse.json(notice, { status: 201 });
 }
 
