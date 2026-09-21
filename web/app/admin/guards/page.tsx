@@ -159,7 +159,14 @@ function GuardSalaryPanel({
   const [logging, setLogging] = useState(false);
   const [err, setErr] = useState("");
 
-  useEffect(() => setAmount(config ? String(config.monthly_amount) : ""), [config]);
+  // Re-sync the amount field when the loaded config changes (e.g. after a reload)
+  // without clobbering it while the office bearer is mid-edit — adjusted during
+  // render rather than in an effect, per https://react.dev/learn/you-might-not-need-an-effect.
+  const [syncedAmount, setSyncedAmount] = useState(config?.monthly_amount);
+  if (config?.monthly_amount !== syncedAmount) {
+    setSyncedAmount(config?.monthly_amount);
+    setAmount(config ? String(config.monthly_amount) : "");
+  }
 
   async function saveConfig(e: React.FormEvent) {
     e.preventDefault();
@@ -255,7 +262,7 @@ function GuardSalaryPanel({
               <span className="font-medium text-zinc-800 dark:text-zinc-200">₹{p.amount}</span>
               <span>for {p.period}</span>
               {p.early ? <Badge tone="amber">early/partial</Badge> : null}
-              {p.note ? <span className="italic">"{p.note}"</span> : null}
+              {p.note ? <span className="italic">&quot;{p.note}&quot;</span> : null}
               <span>{new Date(p.created_at).toLocaleDateString()}</span>
             </div>
           ))}
