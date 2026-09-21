@@ -1,8 +1,15 @@
 import { getEnv, mockStore, uid, type Notification } from "./cloudflare";
 import { getSocietyMembers } from "./membership";
+import { sendPushToUser } from "./push";
 
-/** Notifies every member of a society (excluding one user, e.g. the actor who caused it). */
-export async function notifySociety(societyId: string, title: string, body?: string, excludeUserId?: string): Promise<void> {
+/**
+ * Notifies every member of a society (excluding one user, e.g. the actor who
+ * caused it) — writes the in-app notification and, best-effort, a Web Push to
+ * any device they've subscribed on. Push never blocks or fails this call.
+ * `link` is where clicking the notification (bell item or push) should take
+ * the reader — e.g. the specific notice, defaults to the home page.
+ */
+export async function notifySociety(societyId: string, title: string, body?: string, excludeUserId?: string, link?: string): Promise<void> {
   const members = await getSocietyMembers(societyId);
   const userIds = members.map((m) => m.userId).filter((id) => id !== excludeUserId);
   if (userIds.length === 0) return;
@@ -11,16 +18,17 @@ export async function notifySociety(societyId: string, title: string, body?: str
   if (env?.DB) {
     await env.DB.batch(
       userIds.map((userId) =>
-        env.DB.prepare("INSERT INTO notifications (id, user_id, society_id, title, body, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-          .bind(uid("ntf"), userId, societyId, title, body ?? null, created_at)
+        env.DB.prepare("INSERT INTO notifications (id, user_id, society_id, title, body, link, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          .bind(uid("ntf"), userId, societyId, title, body ?? null, link ?? null, created_at)
       )
     );
-    return;
+  } else {
+    const store = mockStore();
+    for (const userId of userIds) {
+      store.notifications.push({ id: uid("ntf"), user_id: userId, society_id: societyId, title, body: body ?? null, link: link ?? null, created_at });
+    }
   }
-  const store = mockStore();
-  for (const userId of userIds) {
-    store.notifications.push({ id: uid("ntf"), user_id: userId, society_id: societyId, title, body: body ?? null, created_at });
-  }
+  await Promise.all(userIds.map((userId) => sendPushToUser(userId, title, body, link)));
 }
 
 export async function listNotifications(userId: string, societyId: string, limit = 20): Promise<Notification[]> {

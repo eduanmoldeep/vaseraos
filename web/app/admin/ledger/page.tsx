@@ -103,7 +103,7 @@ export default function LedgerPage() {
       </div>
 
       <Card className="mt-4">
-        <p className="text-sm font-medium">Log an expense (treasurer)</p>
+        <p className="text-sm font-medium">Log an expense (office bearer)</p>
         <form onSubmit={addExpense} className="mt-3 grid gap-3 sm:grid-cols-2">
           <Input required placeholder="Vendor / paid to" value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} />
           <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>

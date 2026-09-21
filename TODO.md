@@ -21,6 +21,32 @@ Full plan: `.claude/plans/pure-scribbling-twilight.md` (guard panic-alarm featur
 - [ ] Backend: sign+send the iOS VoIP push via direct APNs call (Web Crypto ES256
       JWT) once the `.p8`/Team ID/Key ID above are available.
 
+## Future feature ideas (tracked, not started)
+
+Real online maintenance payment (payment gateway — Razorpay/PayU/etc., money
+actually flows through the platform) — **deferred**: needs legal/compliance
+work first (payment aggregator agreement, KYC, RBI guidelines) before any
+build starts. Note: this is distinct from the UPI-QR-plus-screenshot-approval
+flow already shipped (`/dues`, `/admin/maintenance`) — that one never touches
+or holds funds, so it didn't need this.
+
+- [x] ~~Real push notifications (installed PWA / native)~~ — shipped: Web
+      Push (VAPID, `web/lib/push.ts`), toggle in the account dropdown, wired
+      into every `notifySociety()` call (notices, complaint/bill status,
+      etc.). iOS Safari only fires for an installed (Home Screen) PWA —
+      no onboarding nudge for that yet, worth adding if iPhone adoption is low.
+- [ ] QR/OTP visitor gate check-in — ties the visitor log to the guard app
+      instead of being a manually-updated list.
+- [ ] Amenity/parking slot booking.
+- [ ] AGM polls / voting for society governance decisions.
+- [ ] Document vault — bylaws, AGM minutes, agreements, shared per society.
+- [ ] Ledger/dues export (PDF/CSV) for office bearers' own records/AGM use.
+- [ ] Vendor/staff directory — plumber, electrician, security agency contacts per society.
+- [ ] Complaint SLA tracking — auto-escalate to admin if unresolved past 30 days
+      (needs Cloudflare Cron Trigger).
+- [ ] Bulk resident import (CSV) for onboarding an existing society.
+- [ ] Audit log — who approved what bill/complaint/notice, for AGM accountability.
+
 ## Smaller follow-ups
 
 - [ ] `guardapp/`: wire EAS build profiles (staging vs prod `EXPO_PUBLIC_API_BASE_URL`)

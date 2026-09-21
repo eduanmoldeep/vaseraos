@@ -73,7 +73,7 @@ export type Bill = {
   flat: string;
   amount: number;
   month: string;
-  status: "pending" | "paid" | "overdue";
+  status: "pending" | "pending_verification" | "paid" | "overdue";
   society_id: string;
   receipt_key?: string | null;
   paid_at?: string | null;
@@ -85,6 +85,7 @@ export type Notification = {
   society_id: string;
   title: string;
   body?: string | null;
+  link?: string | null;
   read_at?: string | null;
   created_at: string;
 };
@@ -112,6 +113,8 @@ export type Expense = {
   description?: string | null;
   receipt_key?: string | null;
   created_by?: string | null;
+  /** Set when this expense was auto-logged from a guard salary payment, rather than entered by hand. */
+  guard_salary_payment_id?: string | null;
   created_at: string;
 };
 
@@ -121,6 +124,7 @@ export type MaintenanceSetting = {
   society_id: string;
   amount: number;
   cadence: Cadence;
+  upi_id: string | null;
   updated_by: string | null;
   updated_at: string;
 };
@@ -165,6 +169,31 @@ export type Guard = {
 export type GuardPlatform = "android" | "ios";
 export type GuardPushToken = { id: string; guard_id: string; platform: GuardPlatform; expo_token?: string | null; voip_token?: string | null };
 
+/** Office-bearer-set monthly salary for one guard. One row per guard, upserted. */
+export type GuardSalaryConfig = {
+  guard_id: string;
+  society_id: string;
+  monthly_amount: number;
+  updated_by: string | null;
+  updated_at: string;
+};
+
+/** One logged salary payment — may be a partial/early payment against the period, so several rows can share a (guard_id, period). */
+export type GuardSalaryPayment = {
+  id: string;
+  guard_id: string;
+  society_id: string;
+  amount: number;
+  period: string;
+  early: boolean;
+  note: string | null;
+  paid_by: string | null;
+  created_at: string;
+};
+
+/** A resident/admin's browser Web Push subscription — separate from the guard app's Expo tokens above. */
+export type PushSubscriptionRow = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string; created_at: string };
+
 export type SosStatus = "open" | "acknowledged" | "resolved";
 export type SosAlert = {
   id: string;
@@ -195,7 +224,10 @@ const g = globalThis as unknown as {
     notices: Notice[];
     guards: (Guard & { password_hash: string })[];
     guardPushTokens: GuardPushToken[];
+    guardSalaryConfig: GuardSalaryConfig[];
+    guardSalaryPayments: GuardSalaryPayment[];
     sosAlerts: SosAlert[];
+    pushSubscriptions: PushSubscriptionRow[];
   };
 };
 
@@ -237,7 +269,10 @@ export function mockStore() {
       ],
       guards: [],
       guardPushTokens: [],
+      guardSalaryConfig: [],
+      guardSalaryPayments: [],
       sosAlerts: [],
+      pushSubscriptions: [],
     };
   }
   return g.__vasera;

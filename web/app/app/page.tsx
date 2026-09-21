@@ -213,10 +213,12 @@ export default function ResidentApp() {
       </Card>
 
       <div className={`grid gap-4 sm:grid-cols-2 ${isOwner ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
-        <Card>
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Dues</p>
-          <p className="mt-1 text-xl font-semibold">{summary ? `₹${summary.dues.toLocaleString("en-IN")}` : "—"}</p>
-        </Card>
+        <Link href="/dues">
+          <Card className="transition hover:bg-zinc-50 dark:hover:bg-zinc-900">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Dues</p>
+            <p className="mt-1 text-xl font-semibold">{summary ? `₹${summary.dues.toLocaleString("en-IN")}` : "—"}</p>
+          </Card>
+        </Link>
         <Link href="/complaints">
           <Card className="transition hover:bg-zinc-50 dark:hover:bg-zinc-900">
             <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">My open complaints</p>

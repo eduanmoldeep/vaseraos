@@ -30,7 +30,7 @@ export default function AuditLogPage() {
 
   return (
     <div>
-      <PageHeader title="Audit log" subtitle="Role and office changes, plus every admin impersonation — newest first." />
+      <PageHeader title="Audit log" subtitle="Role, office, bill, complaint and notice actions, plus every admin impersonation — newest first." />
       {error ? <div className="mb-4"><ErrorBanner text={error} onRetry={load} /></div> : null}
       <div className="grid gap-2">
         {loading ? (
@@ -72,6 +72,9 @@ function describe(action: string): string {
     case "sos.raise": return "raised an SOS alarm in";
     case "sos.acknowledge": return "acknowledged an SOS alarm in";
     case "sos.resolve": return "resolved an SOS alarm in";
+    case "bill.status_update": return "updated a bill in";
+    case "complaint.status_update": return "updated a complaint in";
+    case "notice.create": return "posted a notice in";
     default: return action;
   }
 }

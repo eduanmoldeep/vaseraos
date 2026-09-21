@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getEnv, mockStore, uid, DEFAULT_SOCIETY_ID, type Complaint } from "@/lib/cloudflare";
 import { getViewer, requireSocietyAdmin, requireSocietyMember } from "@/lib/auth";
 import { getMyFlat, getOffices } from "@/lib/membership";
+import { getRequestIp, logAudit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
@@ -90,7 +91,9 @@ export async function PATCH(req: Request) {
     const denied = await requireSocietyAdmin(row.society_id);
     if (denied) return denied;
     await env.DB.prepare("UPDATE complaints SET status = ? WHERE id = ?").bind(status, id).run();
-    const updated = await env.DB.prepare("SELECT * FROM complaints WHERE id = ?").bind(id).first();
+    const updated = await env.DB.prepare("SELECT * FROM complaints WHERE id = ?").bind(id).first<Complaint>();
+    const viewer = await getViewer();
+    if (viewer) await logAudit({ actorId: viewer.id, action: "complaint.status_update", societyId: row.society_id, detail: `${updated?.title ?? id} → ${status}`, ip: getRequestIp(req) });
     return NextResponse.json(updated);
   }
   const complaint = mockStore().complaints.find((c) => c.id === id);
@@ -98,6 +101,8 @@ export async function PATCH(req: Request) {
   const denied = await requireSocietyAdmin(complaint.society_id);
   if (denied) return denied;
   complaint.status = status as Complaint["status"];
+  const viewer = await getViewer();
+  if (viewer) await logAudit({ actorId: viewer.id, action: "complaint.status_update", societyId: complaint.society_id, detail: `${complaint.title} → ${status}`, ip: getRequestIp(req) });
   return NextResponse.json(complaint);
 }
 

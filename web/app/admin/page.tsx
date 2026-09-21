@@ -9,16 +9,6 @@ import { useSelectedSociety } from "@/lib/society";
 type Summary = { residents: number; dues: number; openComplaints: number; activeVisitors: number };
 type Notice = { id: string; title: string; body: string };
 
-const MODULES = [
-  { href: "/admin/societies", title: "Societies", desc: "Admin: tenants & switching", dot: "bg-teal-500" },
-  { href: "/admin/residents", title: "Residents", desc: "Flats, owners, tenants & members", dot: "bg-sky-500" },
-  { href: "/admin/maintenance", title: "Maintenance", desc: "Bills, dues & collection", dot: "bg-amber-500" },
-  { href: "/admin/ledger", title: "Ledger", desc: "Income, expenses & running balance", dot: "bg-indigo-500" },
-  { href: "/admin/complaints", title: "Complaints", desc: "Tickets & resolution status", dot: "bg-rose-500" },
-  { href: "/admin/visitors", title: "Visitors", desc: "Gate entries & check-ins", dot: "bg-violet-500" },
-  { href: "/admin/notices", title: "Notices", desc: "Announcements with attachments", dot: "bg-emerald-500" },
-];
-
 export default function Home() {
   const society = useSelectedSociety();
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -60,24 +50,7 @@ export default function Home() {
         )}
       </div>
 
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
-        <Card>
-          <h2 className="font-medium">Modules</h2>
-          <ul className="mt-3 space-y-1">
-            {MODULES.map((m) => (
-              <li key={m.href}>
-                <Link href={m.href} className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition hover:bg-zinc-50 dark:hover:bg-zinc-900">
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${m.dot}`} />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">{m.title}</span>
-                    <span className="block truncate text-xs text-zinc-500">{m.desc}</span>
-                  </span>
-                  <span aria-hidden className="ml-auto text-zinc-400">→</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
+      <div className="mt-8 max-w-xl">
         <Card>
           <h2 className="font-medium">Latest notices</h2>
           {!society ? (

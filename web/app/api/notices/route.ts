@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { DEFAULT_SOCIETY_ID, getEnv, mockStore, uid } from "@/lib/cloudflare";
 import { getViewer, requireSocietyAdmin, requireSocietyMember, requireSocietyOffice } from "@/lib/auth";
 import { notifySociety } from "@/lib/notifications";
+import { getRequestIp, logAudit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
@@ -42,7 +43,8 @@ export async function POST(req: Request) {
     mockStore().notices.push(notice);
   }
   const viewer = await getViewer();
-  await notifySociety(society_id, `New notice: ${notice.title}`, notice.body.slice(0, 140), viewer?.id);
+  await notifySociety(society_id, `New notice: ${notice.title}`, notice.body.slice(0, 140), viewer?.id, `/notices#n_${notice.id}`);
+  if (viewer) await logAudit({ actorId: viewer.id, action: "notice.create", societyId: society_id, detail: notice.title, ip: getRequestIp(req) });
   return NextResponse.json(notice, { status: 201 });
 }
 

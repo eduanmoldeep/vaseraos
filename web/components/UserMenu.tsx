@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { AuthUser } from "@/lib/cloudflare";
+import { PushToggle } from "@/components/PushToggle";
 
 /** Top-right identity control: avatar initials + name, opens to show email and log out. */
 export function UserMenu() {
@@ -73,6 +74,7 @@ export function UserMenu() {
             </svg>
             My complaints
           </Link>
+          <PushToggle />
           <div className="my-1 h-px bg-zinc-100 dark:bg-zinc-800" />
           <Link
             href="/feedback"

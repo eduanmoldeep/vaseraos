@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { DEFAULT_SOCIETY_ID, getEnv, mockStore, uid, type Expense } from "@/lib/cloudflare";
-import { getViewer, requireSocietyMember, requireSocietyOffice } from "@/lib/auth";
+import { DEFAULT_SOCIETY_ID, getEnv, mockStore } from "@/lib/cloudflare";
+import { getViewer, requireSocietyAdmin, requireSocietyMember } from "@/lib/auth";
 import { storeReceipt } from "@/lib/uploads";
+import { createExpense } from "@/lib/expenses";
 
 export const runtime = "nodejs";
 
@@ -19,12 +20,12 @@ export async function GET(req: Request) {
   return NextResponse.json(mockStore().expenses.filter((e) => e.society_id === society_id));
 }
 
-// Logging an expense is the treasurer's job — same office that owns the maintenance dues config.
+// Logging an expense is any office bearer's job, not just the treasurer's.
 export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Send multipart/form-data." }, { status: 400 });
   const society_id = String(form.get("society_id") ?? DEFAULT_SOCIETY_ID);
-  const denied = await requireSocietyOffice(society_id, "treasurer");
+  const denied = await requireSocietyAdmin(society_id);
   if (denied) return denied;
 
   const vendor = String(form.get("vendor") ?? "").trim();
@@ -39,26 +40,15 @@ export async function POST(req: Request) {
   }
 
   const viewer = await getViewer();
-  const expense: Expense = {
-    id: uid("e"),
-    society_id,
+  const expense = await createExpense({
+    societyId: society_id,
     category: String(form.get("category") ?? "general"),
     vendor,
     amount,
     description: form.get("description") ? String(form.get("description")) : null,
-    receipt_key: receipt_key ?? null,
-    created_by: viewer?.id ?? null,
-    created_at: new Date().toISOString(),
-  };
-
-  const env = await getEnv();
-  if (env?.DB) {
-    await env.DB.prepare(
-      "INSERT INTO expenses (id, society_id, category, vendor, amount, description, receipt_key, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(expense.id, expense.society_id, expense.category, expense.vendor, expense.amount, expense.description, expense.receipt_key, expense.created_by, expense.created_at).run();
-  } else {
-    mockStore().expenses.push(expense);
-  }
+    receiptKey: receipt_key ?? null,
+    createdBy: viewer?.id ?? null,
+  });
   return NextResponse.json(expense, { status: 201 });
 }
 
@@ -69,7 +59,7 @@ export async function DELETE(req: Request) {
   if (env?.DB) {
     const row = await env.DB.prepare("SELECT society_id FROM expenses WHERE id = ?").bind(id).first<{ society_id: string }>();
     if (!row) return NextResponse.json({ error: "Expense not found" }, { status: 404 });
-    const denied = await requireSocietyOffice(row.society_id, "treasurer");
+    const denied = await requireSocietyAdmin(row.society_id);
     if (denied) return denied;
     await env.DB.prepare("DELETE FROM expenses WHERE id = ?").bind(id).run();
     return NextResponse.json({ ok: true, id });
@@ -77,7 +67,7 @@ export async function DELETE(req: Request) {
   const store = mockStore();
   const idx = store.expenses.findIndex((e) => e.id === id);
   if (idx === -1) return NextResponse.json({ error: "Expense not found" }, { status: 404 });
-  const denied = await requireSocietyOffice(store.expenses[idx].society_id, "treasurer");
+  const denied = await requireSocietyAdmin(store.expenses[idx].society_id);
   if (denied) return denied;
   store.expenses.splice(idx, 1);
   return NextResponse.json({ ok: true, id });

@@ -1,9 +1,10 @@
 "use client";
 
 import { startTransition, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useSelectedSociety } from "@/lib/society";
 
-type Notification = { id: string; title: string; body?: string | null; read_at?: string | null; created_at: string };
+type Notification = { id: string; title: string; body?: string | null; link?: string | null; read_at?: string | null; created_at: string };
 
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -89,11 +90,16 @@ export function NotificationBell() {
               <p className="px-2 py-6 text-center text-sm text-zinc-500">No notifications yet.</p>
             ) : (
               items.map((n) => (
-                <div key={n.id} className={`rounded-lg px-2 py-2 text-sm ${!n.read_at ? "bg-indigo-50 dark:bg-indigo-950/30" : ""}`}>
+                <Link
+                  key={n.id}
+                  href={n.link ?? "/"}
+                  onClick={() => setOpen(false)}
+                  className={`block rounded-lg px-2 py-2 text-sm transition hover:bg-zinc-50 dark:hover:bg-zinc-900 ${!n.read_at ? "bg-indigo-50 dark:bg-indigo-950/30" : ""}`}
+                >
                   <p className="font-medium">{n.title}</p>
                   {n.body ? <p className="mt-0.5 text-xs text-zinc-500">{n.body}</p> : null}
                   <p className="mt-1 text-[11px] text-zinc-400">{timeAgo(n.created_at)}</p>
-                </div>
+                </Link>
               ))
             )}
           </div>
