@@ -4,6 +4,7 @@ import { getViewer, requireSocietyAdmin, requireSocietyMember, requireSocietyOff
 import { getMyFlat } from "@/lib/membership";
 import { ensureMaintenanceDue } from "@/lib/maintenance";
 import { storeReceipt } from "@/lib/uploads";
+import { getRequestIp, logAudit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
@@ -153,7 +154,9 @@ export async function PATCH(req: Request) {
     await env.DB.prepare(`UPDATE maintenance_bills SET status = ?, paid_at = ?, receipt_key = ${receiptExpr} WHERE id = ?`)
       .bind(...bindings)
       .run();
-    const updated = await env.DB.prepare("SELECT * FROM maintenance_bills WHERE id = ?").bind(id).first();
+    const updated = await env.DB.prepare("SELECT * FROM maintenance_bills WHERE id = ?").bind(id).first<Bill>();
+    const viewer = await getViewer();
+    if (viewer) await logAudit({ actorId: viewer.id, action: "bill.status_update", societyId: row.society_id, detail: `${updated?.flat ?? id} → ${status}`, ip: getRequestIp(req) });
     return NextResponse.json(updated);
   }
   const bill = mockStore().bills.find((b) => b.id === id);
@@ -163,6 +166,8 @@ export async function PATCH(req: Request) {
   bill.status = status as Bill["status"];
   bill.paid_at = status === "paid" ? new Date().toISOString() : null;
   if (status === "pending") bill.receipt_key = null;
+  const viewer = await getViewer();
+  if (viewer) await logAudit({ actorId: viewer.id, action: "bill.status_update", societyId: bill.society_id, detail: `${bill.flat} → ${status}`, ip: getRequestIp(req) });
   return NextResponse.json(bill);
 }
 
