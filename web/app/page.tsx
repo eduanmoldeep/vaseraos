@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthForm } from "@/components/AuthForm";
-import { Button, Card, Input } from "@/components/ui";
+import { Button, Card, Input, Textarea } from "@/components/ui";
 import type { AuthUser } from "@/lib/cloudflare";
 
 const FEATURES = [
@@ -139,6 +139,8 @@ export default function Landing() {
         </div>
       </div>
 
+      <LeadForm />
+
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         {[
           { t: "One app per society", d: "Admins switch between societies; every record stays scoped to its own." },
@@ -151,6 +153,83 @@ export default function Landing() {
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+function LeadForm() {
+  const empty = { name: "", phone: "", email: "", society_name: "", city: "", units: "", message: "", website: "" };
+  const [form, setForm] = useState(empty);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
+  const set = (k: keyof typeof empty) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm({ ...form, [k]: e.target.value });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Couldn't send your details.");
+      setSent(true);
+      setForm(empty);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send your details.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div id="get-in-touch" className="mt-16 grid items-start gap-6 lg:grid-cols-2">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">Want VaseraOS for your society?</h2>
+        <p className="mt-1 max-w-md text-sm text-zinc-500">
+          Leave your details and we&apos;ll get in touch to set up a demo for your society.
+        </p>
+      </div>
+      <Card className="w-full max-w-md justify-self-center lg:justify-self-end">
+        {sent ? (
+          <>
+            <p className="font-semibold">Thanks — we&apos;ve got your details</p>
+            <p className="mt-2 text-sm text-zinc-500">We&apos;ll reach out shortly.</p>
+            <Button variant="ghost" size="sm" onClick={() => setSent(false)} className="mt-4">Send another</Button>
+          </>
+        ) : (
+          <form onSubmit={submit} className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <Input required placeholder="Your name" value={form.name} onChange={set("name")} maxLength={100} />
+              <Input required type="tel" placeholder="Phone" value={form.phone} onChange={set("phone")} maxLength={20} />
+            </div>
+            <Input type="email" placeholder="Email (optional)" value={form.email} onChange={set("email")} maxLength={120} />
+            <Input placeholder="Society name" value={form.society_name} onChange={set("society_name")} maxLength={120} />
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="City" value={form.city} onChange={set("city")} maxLength={80} />
+              <Input type="number" min={1} placeholder="No. of flats" value={form.units} onChange={set("units")} />
+            </div>
+            <Textarea placeholder="Anything we should know? (optional)" rows={3} value={form.message} onChange={set("message")} maxLength={1000} />
+            <input
+              type="text"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              className="hidden"
+              value={form.website}
+              onChange={set("website")}
+            />
+            {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+            <Button variant="accent" className="w-full" busy={busy} busyText="Sending…">Get in touch</Button>
+          </form>
+        )}
+      </Card>
     </div>
   );
 }
