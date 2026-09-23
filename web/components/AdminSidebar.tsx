@@ -32,7 +32,7 @@ export function AdminSidebar() {
                   : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
               }`}
             >
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${n.dot}`} />
+              <n.icon className={`h-[18px] w-[18px] shrink-0 ${n.color}`} strokeWidth={2} />
               {n.label}
             </Link>
           );

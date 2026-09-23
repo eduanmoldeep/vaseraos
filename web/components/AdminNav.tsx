@@ -26,7 +26,7 @@ export function AdminNav() {
                 : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900"
             }`}
           >
-            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${n.dot}`} />
+            <n.icon className={`h-4 w-4 shrink-0 ${n.color}`} strokeWidth={2} />
             {n.label}
           </Link>
         );
