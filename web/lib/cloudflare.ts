@@ -104,7 +104,10 @@ export type HelpTicket = {
   resolved_at?: string | null;
 };
 
+export type LeadStatus = "new" | "follow_up" | "wip" | "closed_lost" | "closed_won";
+
 export type Lead = {
+  status: LeadStatus;
   id: string;
   name: string;
   phone: string;
