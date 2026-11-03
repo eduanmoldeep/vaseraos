@@ -31,14 +31,14 @@ export function ImpersonationBanner() {
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-500 px-4 py-2 text-sm font-medium text-amber-950">
+    <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-500 px-4 py-2 text-base font-medium text-amber-950">
       <span>
         Logged in as <strong>{viewer?.name}</strong> — impersonated by {admin.name}
       </span>
       <button
         onClick={back}
         disabled={returning}
-        className="rounded-lg bg-amber-950/10 px-3 py-1 text-xs font-semibold hover:bg-amber-950/20 disabled:opacity-60"
+        className="min-h-10 rounded-lg bg-amber-950/10 px-3 text-sm font-semibold hover:bg-amber-950/20 disabled:opacity-60"
       >
         {returning ? "Returning…" : "Back to admin"}
       </button>

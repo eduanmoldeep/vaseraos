@@ -2,78 +2,124 @@
 
 import { startTransition, useEffect, useState } from "react";
 import Link from "next/link";
-import { Card, PageHeader } from "@/components/ui";
+import { Icon, type IconName } from "@/components/icons";
 import { NeedsSociety } from "@/components/NeedsSociety";
+import { Card, LinkButton, PageHeader, Section, Stat } from "@/components/ui";
+import type { Bill, Complaint, Notice, Visitor } from "@/lib/cloudflare";
+import { inr } from "@/lib/labels";
 import { useSelectedSociety } from "@/lib/society";
 
 type Summary = { residents: number; dues: number; openComplaints: number; activeVisitors: number };
-type Notice = { id: string; title: string; body: string };
 
-export default function Home() {
+/** Committee home: the jobs waiting on someone first, then quick actions, then the numbers. */
+export default function AdminDashboard() {
   const society = useSelectedSociety();
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [bills, setBills] = useState<Bill[] | null>(null);
+  const [complaints, setComplaints] = useState<Complaint[] | null>(null);
+  const [visitors, setVisitors] = useState<Visitor[] | null>(null);
   const [notices, setNotices] = useState<Notice[]>([]);
 
-  const load = (id: string | null = society) => {
-    if (!id) { setSummary(null); setNotices([]); return; }
-    fetch(`/api/summary?society=${id}`).then((r) => r.json()).then(setSummary).catch(() => {});
-    fetch(`/api/notices?society=${id}`).then((r) => r.json()).then((d) => setNotices(d.slice(0, 3))).catch(() => {});
-  };
   useEffect(() => {
-    startTransition(() => load(society));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!society) return;
+    startTransition(() => {
+      const json = <T,>(url: string, fallback: T) => fetch(url).then((r) => (r.ok ? r.json() : fallback)).catch(() => fallback) as Promise<T>;
+      json<Summary | null>(`/api/summary?society=${society}`, null).then(setSummary);
+      json<Bill[]>(`/api/bills?society=${society}`, []).then(setBills);
+      json<Complaint[]>(`/api/complaints?society=${society}`, []).then(setComplaints);
+      json<Visitor[]>(`/api/visitors?society=${society}`, []).then(setVisitors);
+      json<Notice[]>(`/api/notices?society=${society}`, []).then((d) => setNotices(d.slice(0, 3)));
+    });
   }, [society]);
 
-  const stats = [
-    { label: "Residents", value: summary?.residents ?? "—", dot: "bg-sky-500" },
-    { label: "Outstanding dues", value: summary ? `₹${summary.dues.toLocaleString("en-IN")}` : "—", dot: "bg-amber-500" },
-    { label: "Open complaints", value: summary?.openComplaints ?? "—", dot: "bg-rose-500" },
-    { label: "Active visitors", value: summary?.activeVisitors ?? "—", dot: "bg-emerald-500" },
-  ];
+  if (!society) {
+    return (
+      <div>
+        <PageHeader title="Dashboard" />
+        <NeedsSociety label="the dashboard" />
+      </div>
+    );
+  }
+
+  const toApprove = bills?.filter((b) => b.status === "pending_verification").length;
+  const newComplaints = complaints?.filter((c) => c.status === "open").length;
+  const expected = visitors?.filter((v) => v.status === "expected").length;
+  const loaded = toApprove !== undefined && newComplaints !== undefined && expected !== undefined;
+  const allClear = loaded && toApprove === 0 && newComplaints === 0 && expected === 0;
 
   return (
     <div>
-      <PageHeader title="Overview" subtitle="Live society data at a glance." />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {society ? (
-          stats.map((s) => (
-            <Card key={s.label}>
-              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                {s.label}
-              </div>
-              <p className="mt-2 text-2xl font-semibold tracking-tight">{s.value}</p>
-            </Card>
-          ))
-        ) : (
-          <div className="sm:col-span-2 lg:col-span-4"><NeedsSociety label="dashboard stats" /></div>
-        )}
-      </div>
+      <PageHeader title="Dashboard" subtitle="What needs your attention today." />
 
-      <div className="mt-8 max-w-xl">
-        <Card>
-          <h2 className="font-medium">Latest notices</h2>
-          {!society ? (
-            <p className="mt-3 text-sm text-zinc-500">Select a society to see notices.</p>
-          ) : (
-          <div className="mt-3 space-y-3">
-            {notices.length === 0 ? (
-              <p className="text-sm text-zinc-500">No notices yet.</p>
-            ) : (
-              notices.map((n) => (
-                <div key={n.id} className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-                  <p className="text-sm font-medium">{n.title}</p>
-                  <p className="mt-1 line-clamp-2 text-xs text-zinc-500">{n.body}</p>
-                </div>
-              ))
-            )}
-          </div>
-          )}
-          <Link href="/admin/notices" className="mt-4 inline-block text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-            View all notices
-          </Link>
+      <h2 className="sr-only">Needs your attention</h2>
+      {allClear ? (
+        <Card tone="green">
+          <p className="flex items-center gap-2 text-lg font-semibold text-green-900 dark:text-green-200">
+            <Icon name="check" className="h-6 w-6" /> All caught up — nothing is waiting on you.
+          </p>
         </Card>
-      </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <AttentionCard href="/admin/maintenance" icon="wallet" count={toApprove} one="payment to approve" many="payments to approve" />
+          <AttentionCard href="/admin/complaints" icon="wrench" count={newComplaints} one="new complaint" many="new complaints" />
+          <AttentionCard href="/admin/visitors" icon="door" count={expected} one="visitor expected" many="visitors expected" />
+        </div>
+      )}
+
+      <Section title="Quick actions">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <LinkButton href="/admin/notices" variant="secondary" icon="megaphone" className="justify-start">Post a notice</LinkButton>
+          <LinkButton href="/admin/residents" variant="secondary" icon="users" className="justify-start">Add a resident</LinkButton>
+          <LinkButton href="/admin/ledger" variant="secondary" icon="receipt" className="justify-start">Record an expense</LinkButton>
+        </div>
+      </Section>
+
+      <Section title="At a glance">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Stat label="Residents" value={summary?.residents ?? "…"} href="/admin/residents" />
+          <Stat label="Unpaid dues" value={summary ? inr(summary.dues) : "…"} href="/admin/maintenance" />
+          <Stat label="Open complaints" value={summary?.openComplaints ?? "…"} href="/admin/complaints" />
+          <Stat label="Visitors expected or inside" value={summary?.activeVisitors ?? "…"} href="/admin/visitors" />
+        </div>
+      </Section>
+
+      <Section title="Latest notices" action={<LinkButton href="/admin/notices" variant="secondary" size="sm">All notices</LinkButton>}>
+        {notices.length === 0 ? (
+          <p className="text-base text-zinc-600 dark:text-zinc-400">No notices yet.</p>
+        ) : (
+          <div className="grid gap-3">
+            {notices.map((n) => (
+              <Card key={n.id}>
+                <p className="text-lg font-semibold">{n.title}</p>
+                <p className="mt-1 line-clamp-2 text-base text-zinc-700 dark:text-zinc-300">{n.body}</p>
+              </Card>
+            ))}
+          </div>
+        )}
+      </Section>
     </div>
+  );
+}
+
+function AttentionCard({ href, icon, count, one, many }: { href: string; icon: IconName; count: number | undefined; one: string; many: string }) {
+  const busy = (count ?? 0) > 0;
+  return (
+    <Link
+      href={href}
+      className={`flex min-h-20 items-center gap-4 rounded-2xl border-2 p-4 transition ${
+        busy
+          ? "border-amber-400 bg-amber-50 hover:border-amber-500 dark:border-amber-700 dark:bg-amber-950/30"
+          : "border-zinc-200 bg-white hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950"
+      }`}
+    >
+      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${busy ? "bg-amber-200 text-amber-950 dark:bg-amber-900 dark:text-amber-100" : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"}`}>
+        <Icon name={icon} className="h-6 w-6" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-3xl font-bold leading-none">{count ?? "…"}</span>
+        <span className="mt-1 block text-base font-medium">{count === 1 ? one : many}</span>
+      </span>
+      <Icon name="chevronRight" className="h-5 w-5 text-zinc-500" />
+    </Link>
   );
 }

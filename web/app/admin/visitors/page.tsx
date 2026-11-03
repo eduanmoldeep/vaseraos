@@ -1,121 +1,180 @@
 "use client";
 
 import { startTransition, useEffect, useState } from "react";
-import { Badge, Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader, Select } from "@/components/ui";
+import { AddPanel } from "@/components/AddPanel";
 import { NeedsSociety } from "@/components/NeedsSociety";
+import { Badge, Button, Card, ChoiceGroup, Empty, ErrorBanner, Field, Input, ListSkeleton, PageHeader, Tabs } from "@/components/ui";
 import type { Visitor } from "@/lib/cloudflare";
-import { getSelectedSociety, useSelectedSociety } from "@/lib/society";
+import { labelFor, statusOf, VISITOR_PURPOSES, VISITOR_STATUS } from "@/lib/labels";
+import { useSelectedSociety } from "@/lib/society";
+
+type Status = Visitor["status"];
+type Purpose = (typeof VISITOR_PURPOSES)[number]["value"];
 
 export default function VisitorsPage() {
   const society = useSelectedSociety();
-  const [rows, setRows] = useState<Visitor[]>([]);
-  const [form, setForm] = useState({ name: "", flat: "", purpose: "Guest" });
-  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<Visitor[] | null>(null);
+  const [view, setView] = useState<Status>("expected");
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
 
   const load = (id: string | null = society) => {
-    if (!id) { setRows([]); setLoading(false); return; }
-    setLoading(true);
+    if (!id) return;
     setError("");
     fetch(`/api/visitors?society=${id}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setRows)
-      .catch(() => setError("Couldn't load visitors."))
-      .finally(() => setLoading(false));
+      .catch(() => setError("Couldn't load visitors."));
   };
   useEffect(() => {
     startTransition(() => load(society));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [society]);
 
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
+  async function move(v: Visitor, to: Status) {
+    setBusyId(v.id);
     try {
-      await fetch("/api/visitors", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, society_id: getSelectedSociety() }) });
-      setForm({ name: "", flat: "", purpose: "Guest" });
-      load();
+      const res = await fetch("/api/visitors", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: v.id, status: to }),
+      });
+      if (!res.ok) throw new Error();
+      setRows((prev) => (prev ?? []).map((r) => (r.id === v.id ? { ...r, status: to } : r)));
     } catch {
-      setError("Couldn't pre-approve visitor. Try again.");
+      setError("Couldn't update that visitor. Please try again.");
     } finally {
-      setSaving(false);
+      setBusyId(null);
     }
   }
 
-  async function setStatus(id: string, status: string) {
-    await fetch("/api/visitors", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id, status }),
-    });
-    load();
-  }
-
-  async function remove(id: string) {
-    if (!confirm("Delete this visitor log?")) return;
-    await fetch(`/api/visitors?id=${id}`, { method: "DELETE" });
+  async function remove(v: Visitor) {
+    if (!confirm(`Delete the visitor entry for ${v.name}?`)) return;
+    await fetch(`/api/visitors?id=${v.id}`, { method: "DELETE" });
     load();
   }
 
   if (!society) {
     return (
       <div>
-        <PageHeader title="Visitors" subtitle="Gate log — expected → checked in → checked out." />
-        <div className="mt-4"><NeedsSociety label="visitors" /></div>
+        <PageHeader title="Visitors" />
+        <NeedsSociety label="visitors" />
       </div>
     );
   }
 
+  const count = (s: Status) => (rows ?? []).filter((v) => v.status === s).length;
+  const listed = (rows ?? []).filter((v) => v.status === view);
+
   return (
     <div>
-      <PageHeader title="Visitors" subtitle="Gate log — expected → checked in → checked out." />
-      <Card>
-        <form onSubmit={add} className="grid gap-3 sm:grid-cols-4">
-          <Input required placeholder="Visitor name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <Input required placeholder="Flat to visit" value={form.flat} onChange={(e) => setForm({ ...form, flat: e.target.value })} />
-          <Select value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })}>
-            <option value="Guest">Guest</option>
-            <option value="Delivery">Delivery</option>
-            <option value="HouseHelp">HouseHelp</option>
-            <option value="Home Service">Home Service</option>
-          </Select>
-          <Button busy={saving} busyText="Adding…">Pre-approve</Button>
-        </form>
-      </Card>
+      <PageHeader title="Visitors" subtitle="Who is expected, who is inside, and who has left." />
+
+      <AddVisitor society={society} onAdded={() => { setView("expected"); load(); }} />
+
       {error ? <div className="mt-4"><ErrorBanner text={error} onRetry={() => load()} /></div> : null}
+
+      <div className="mt-6">
+        <Tabs<Status>
+          label="Show visitors"
+          value={view}
+          onChange={setView}
+          tabs={[
+            { id: "expected", label: "Expected", count: count("expected") },
+            { id: "checked_in", label: "Inside", count: count("checked_in") },
+            { id: "checked_out", label: "Left", count: count("checked_out") },
+          ]}
+        />
+      </div>
+
       <div className="mt-4 grid gap-3">
-        {loading ? (
+        {rows === null ? (
           <ListSkeleton />
-        ) : rows.length === 0 ? (
-          <Empty text="No visitors logged." />
+        ) : listed.length === 0 ? (
+          <Empty text={view === "expected" ? "No one is expected." : view === "checked_in" ? "No visitors inside right now." : "No one has left yet."} />
         ) : (
-          rows.map((v) => (
-            <Card key={v.id} className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="font-medium">{v.name} <span className="text-zinc-500">→ {v.flat}</span></p>
-                <p className="text-xs text-zinc-500">{v.purpose}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge tone={v.status === "checked_in" ? "green" : v.status === "checked_out" ? "zinc" : "blue"}>{v.status.replace("_", " ")}</Badge>
-                <Select
-                  value={v.status}
-                  onChange={(e) => setStatus(v.id, e.target.value)}
-                  className="w-auto px-2 py-1 text-xs"
-                  aria-label={`Visitor status for ${v.name}`}
-                >
-                  <option value="expected">expected</option>
-                  <option value="checked_in">checked in</option>
-                  <option value="checked_out">checked out</option>
-                </Select>
-                <Button variant="danger" size="sm" onClick={() => remove(v.id)} aria-label={`Delete visitor ${v.name}`}>
-                  Delete
-                </Button>
-              </div>
-            </Card>
-          ))
+          listed.map((v) => {
+            const s = statusOf(VISITOR_STATUS, v.status);
+            return (
+              <Card key={v.id} className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-lg font-semibold">{v.name}</p>
+                  <p className="text-base text-zinc-600 dark:text-zinc-400">
+                    Visiting flat {v.flat} · {labelFor(VISITOR_PURPOSES, v.purpose)}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={s.tone}>{s.label}</Badge>
+                  {v.status === "expected" ? (
+                    <Button icon="door" busy={busyId === v.id} busyText="Saving…" onClick={() => move(v, "checked_in")}>
+                      Let in
+                    </Button>
+                  ) : v.status === "checked_in" ? (
+                    <Button variant="secondary" icon="logout" busy={busyId === v.id} busyText="Saving…" onClick={() => move(v, "checked_out")}>
+                      Has left
+                    </Button>
+                  ) : null}
+                  <Button variant="danger" size="sm" onClick={() => remove(v)}>
+                    Delete
+                  </Button>
+                </div>
+              </Card>
+            );
+          })
         )}
       </div>
     </div>
+  );
+}
+
+function AddVisitor({ society, onAdded }: { society: string; onAdded: () => void }) {
+  const [form, setForm] = useState({ name: "", flat: "", purpose: "Guest" as Purpose });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function add(e: React.FormEvent, close: () => void) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/visitors", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...form, society_id: society }),
+      });
+      if (!res.ok) throw new Error();
+      setForm({ name: "", flat: "", purpose: "Guest" });
+      close();
+      onAdded();
+    } catch {
+      setError("Couldn't add the visitor. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AddPanel label="Add an expected visitor" variant="secondary">
+      {(close) => (
+        <form onSubmit={(e) => add(e, close)} className="grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Visitor's name">
+              <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </Field>
+            <Field label="Flat they are visiting">
+              <Input required value={form.flat} onChange={(e) => setForm({ ...form, flat: e.target.value })} placeholder="A-101" />
+            </Field>
+          </div>
+          <fieldset>
+            <legend className="mb-2 text-base font-medium">Reason for visit</legend>
+            <ChoiceGroup name="admin_purpose" options={VISITOR_PURPOSES} value={form.purpose} onChange={(v) => setForm({ ...form, purpose: v })} />
+          </fieldset>
+          {error ? <ErrorBanner text={error} /> : null}
+          <Button icon="check" busy={saving} busyText="Saving…" className="sm:w-fit">
+            Add visitor
+          </Button>
+        </form>
+      )}
+    </AddPanel>
   );
 }

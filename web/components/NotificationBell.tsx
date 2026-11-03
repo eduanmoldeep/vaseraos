@@ -2,19 +2,11 @@
 
 import { startTransition, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Icon } from "@/components/icons";
+import { timeAgo } from "@/lib/labels";
 import { useSelectedSociety } from "@/lib/society";
 
 type Notification = { id: string; title: string; body?: string | null; link?: string | null; read_at?: string | null; created_at: string };
-
-function timeAgo(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(ms / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
 
 /** Bell with an unread count, polling every 30s. Dropdown lists recent notifications and marks them read on open. */
 export function NotificationBell() {
@@ -64,41 +56,40 @@ export function NotificationBell() {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ""}`}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+        aria-expanded={open}
+        className="relative flex h-11 w-11 items-center justify-center rounded-xl text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 0 0-4-5.66V5a2 2 0 1 0-4 0v.34A6 6 0 0 0 6 11v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Icon name="bell" className="h-6 w-6" />
         {unread > 0 ? (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
+          <span className="absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         ) : null}
       </button>
       {open ? (
-        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="fixed inset-x-3 top-16 z-40 rounded-2xl border sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[22rem] border-zinc-200 bg-white p-2 shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
           <div className="flex items-center justify-between px-2 py-1">
-            <p className="text-sm font-medium">Notifications</p>
+            <p className="text-lg font-semibold">Notifications</p>
             {unread > 0 ? (
-              <button onClick={markAllRead} className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+              <button onClick={markAllRead} className="min-h-10 rounded-lg px-2 text-sm font-semibold text-indigo-700 hover:underline dark:text-indigo-300">
                 Mark all read
               </button>
             ) : null}
           </div>
-          <div className="mt-1 max-h-80 overflow-y-auto">
+          <div className="mt-1 max-h-[60vh] overflow-y-auto">
             {items.length === 0 ? (
-              <p className="px-2 py-6 text-center text-sm text-zinc-500">No notifications yet.</p>
+              <p className="px-2 py-6 text-center text-base text-zinc-600 dark:text-zinc-400">No notifications yet.</p>
             ) : (
               items.map((n) => (
                 <Link
                   key={n.id}
                   href={n.link ?? "/"}
                   onClick={() => setOpen(false)}
-                  className={`block rounded-lg px-2 py-2 text-sm transition hover:bg-zinc-50 dark:hover:bg-zinc-900 ${!n.read_at ? "bg-indigo-50 dark:bg-indigo-950/30" : ""}`}
+                  className={`block rounded-xl px-3 py-2.5 text-base transition hover:bg-zinc-100 dark:hover:bg-zinc-900 ${!n.read_at ? "bg-indigo-50 dark:bg-indigo-950/30" : ""}`}
                 >
-                  <p className="font-medium">{n.title}</p>
-                  {n.body ? <p className="mt-0.5 text-xs text-zinc-500">{n.body}</p> : null}
-                  <p className="mt-1 text-[11px] text-zinc-400">{timeAgo(n.created_at)}</p>
+                  <p className="font-semibold">{n.title}</p>
+                  {n.body ? <p className="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300">{n.body}</p> : null}
+                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{timeAgo(n.created_at)}</p>
                 </Link>
               ))
             )}

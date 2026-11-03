@@ -1,56 +1,136 @@
 "use client";
 
 import { startTransition, useEffect, useState } from "react";
-import { Badge, Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader } from "@/components/ui";
+import { AddPanel } from "@/components/AddPanel";
 import { NeedsSociety } from "@/components/NeedsSociety";
-import { getSelectedSociety, useSelectedSociety } from "@/lib/society";
+import { Badge, Button, Card, Empty, ErrorBanner, Field, Input, ListSkeleton, PageHeader, PhoneLink, SuccessBanner } from "@/components/ui";
 import type { Guard, GuardSalaryConfig, GuardSalaryPayment } from "@/lib/cloudflare";
+import { formatDate, formatPeriod, inr } from "@/lib/labels";
+import { useSelectedSociety } from "@/lib/society";
 
 export default function GuardsPage() {
   const society = useSelectedSociety();
-  const [rows, setRows] = useState<Guard[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", phone: "", password: "" });
-  const [saving, setSaving] = useState(false);
-  const [removing, setRemoving] = useState<string | null>(null);
-
+  const [rows, setRows] = useState<Guard[] | null>(null);
   const [salaryConfig, setSalaryConfig] = useState<Record<string, GuardSalaryConfig>>({});
   const [payments, setPayments] = useState<Record<string, GuardSalaryPayment[]>>({});
-
-  const load = (id: string | null = society) => {
-    if (!id) { setRows([]); setLoading(false); return; }
-    setLoading(true);
-    setError("");
-    fetch(`/api/guards?society=${id}`)
-      .then((r) => r.json())
-      .then(setRows)
-      .catch(() => setError("Couldn't load guards."))
-      .finally(() => setLoading(false));
-    loadSalary(id);
-  };
+  const [error, setError] = useState("");
+  const [done, setDone] = useState("");
 
   const loadSalary = (id: string) => {
     fetch(`/api/guards/salary?society=${id}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : []))
       .then((cfgs: GuardSalaryConfig[]) => setSalaryConfig(Object.fromEntries(cfgs.map((c) => [c.guard_id, c]))))
       .catch(() => {});
     fetch(`/api/guards/salary/payments?society=${id}`)
-      .then((r) => r.json())
-      .then((rows: GuardSalaryPayment[]) => {
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: GuardSalaryPayment[]) => {
         const byGuard: Record<string, GuardSalaryPayment[]> = {};
-        for (const p of rows) (byGuard[p.guard_id] ??= []).push(p);
+        for (const p of list) (byGuard[p.guard_id] ??= []).push(p);
         setPayments(byGuard);
       })
       .catch(() => {});
   };
 
+  const load = (id: string | null = society) => {
+    if (!id) return;
+    setError("");
+    fetch(`/api/guards?society=${id}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(setRows)
+      .catch(() => setError("Couldn't load guards."));
+    loadSalary(id);
+  };
   useEffect(() => {
     startTransition(() => load(society));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [society]);
 
-  async function add(e: React.FormEvent) {
+  async function deactivate(g: Guard) {
+    if (!confirm(`Deactivate ${g.name}? They will no longer be able to sign in or receive SOS alarms.`)) return;
+    await fetch(`/api/guards?id=${g.id}&society=${society}`, { method: "DELETE" });
+    setDone(`${g.name} has been deactivated.`);
+    load();
+  }
+
+  if (!society) {
+    return (
+      <div>
+        <PageHeader title="Guards" />
+        <NeedsSociety label="guards" />
+      </div>
+    );
+  }
+
+  const active = (rows ?? []).filter((g) => g.active);
+  const inactive = (rows ?? []).filter((g) => !g.active);
+
+  return (
+    <div>
+      <PageHeader title="Guards" subtitle="Security staff. They get the SOS alarm on the VaseraOS Guard phone app." />
+
+      <Card tone="amber" className="mb-6">
+        <p className="text-lg font-semibold">Guard app sign-in details</p>
+        <p className="mt-1 text-base">
+          Give each guard this <span className="font-semibold">Society ID</span>, plus the phone number and password you set for them:
+        </p>
+        <p className="mt-2 select-all rounded-xl bg-white px-4 py-3 font-mono text-xl font-bold dark:bg-zinc-900">{society}</p>
+      </Card>
+
+      <AddGuard society={society} onAdded={(name) => { setDone(`${name} has been added. Share the sign-in details above with them.`); load(); }} />
+
+      {done ? <div className="mt-4"><SuccessBanner text={done} onClose={() => setDone("")} /></div> : null}
+      {error ? <div className="mt-4"><ErrorBanner text={error} onRetry={() => load()} /></div> : null}
+
+      <div className="mt-6 grid gap-3">
+        {rows === null ? (
+          <ListSkeleton />
+        ) : rows.length === 0 ? (
+          <Empty text="No guards yet." hint="Add your first guard so SOS alarms reach someone." />
+        ) : (
+          <>
+            {active.map((g) => (
+              <Card key={g.id}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-semibold">{g.name}</p>
+                    <PhoneLink phone={g.phone} />
+                  </div>
+                  <Badge tone="green">On duty</Badge>
+                </div>
+                <SalaryPanel guard={g} society={society} config={salaryConfig[g.id]} payments={payments[g.id] ?? []} onChange={(msg) => { if (msg) setDone(msg); loadSalary(society); }} />
+                <div className="mt-4 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                  <Button variant="danger" size="sm" onClick={() => deactivate(g)}>
+                    Deactivate guard
+                  </Button>
+                </div>
+              </Card>
+            ))}
+            {inactive.length > 0 ? (
+              <details className="rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                <summary className="flex min-h-12 cursor-pointer items-center px-5 text-base font-medium">Deactivated guards ({inactive.length})</summary>
+                <ul className="divide-y divide-zinc-200 px-5 pb-3 dark:divide-zinc-800">
+                  {inactive.map((g) => (
+                    <li key={g.id} className="flex items-center justify-between py-3 text-base">
+                      <span>{g.name} · {g.phone}</span>
+                      <Badge tone="zinc">Deactivated</Badge>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AddGuard({ society, onAdded }: { society: string; onAdded: (name: string) => void }) {
+  const [form, setForm] = useState({ name: "", phone: "", password: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function add(e: React.FormEvent, close: () => void) {
     e.preventDefault();
     setSaving(true);
     setError("");
@@ -58,89 +138,45 @@ export default function GuardsPage() {
       const res = await fetch("/api/guards", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...form, society_id: getSelectedSociety() }),
+        body: JSON.stringify({ ...form, society_id: society }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? "Couldn't add guard.");
+      if (!res.ok) throw new Error(data?.error ?? "Couldn't add the guard.");
+      const name = form.name;
       setForm({ name: "", phone: "", password: "" });
-      load();
+      close();
+      onAdded(name);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't add guard.");
+      setError(err instanceof Error ? err.message : "Couldn't add the guard.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function remove(id: string) {
-    if (!confirm("Deactivate this guard? They'll no longer be able to log in or receive alerts.")) return;
-    setRemoving(id);
-    try {
-      await fetch(`/api/guards?id=${id}&society=${society}`, { method: "DELETE" });
-      load();
-    } finally {
-      setRemoving(null);
-    }
-  }
-
-  if (!society) {
-    return (
-      <div>
-        <PageHeader title="Guards" subtitle="Security staff who get the panic-alarm on a resident SOS." />
-        <div className="mt-4"><NeedsSociety label="guards" /></div>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <PageHeader title="Guards" subtitle="Security staff who get the panic-alarm on a resident SOS — logged in on the separate guard app, not this site." />
-      <Card>
-        <form onSubmit={add} className="grid gap-3 sm:grid-cols-4">
-          <Input required placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <Input required placeholder="Phone (their guard-app login)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <Input required type="password" placeholder="Password (8+ characters)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          <Button busy={saving} busyText="Adding…">Add guard</Button>
+    <AddPanel label="Add a guard" icon="shield">
+      {(close) => (
+        <form onSubmit={(e) => add(e, close)} className="grid gap-4 sm:grid-cols-3">
+          <Field label="Guard's name">
+            <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
+          </Field>
+          <Field label="Phone number" hint="They sign in with this.">
+            <Input required type="tel" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </Field>
+          <Field label="Password" hint="At least 8 characters. Tell it to the guard.">
+            <Input required type="text" autoComplete="off" minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          </Field>
+          {error ? <div className="sm:col-span-3"><ErrorBanner text={error} /></div> : null}
+          <Button icon="check" busy={saving} busyText="Adding…" className="sm:col-span-3 sm:w-fit">
+            Add guard
+          </Button>
         </form>
-      </Card>
-      {error ? <div className="mt-4"><ErrorBanner text={error} onRetry={() => load()} /></div> : null}
-      <div className="mt-4 grid gap-3">
-        {loading ? (
-          <ListSkeleton />
-        ) : rows.length === 0 ? (
-          <Empty text="No guards yet." />
-        ) : (
-          rows.map((g) => (
-            <Card key={g.id} className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-medium">{g.name}</p>
-                  <p className="text-xs text-zinc-500">{g.phone}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {!g.active ? <Badge tone="red">deactivated</Badge> : null}
-                  {g.active ? (
-                    <Button variant="danger" size="sm" busy={removing === g.id} busyText="Removing…" onClick={() => remove(g.id)}>
-                      Deactivate
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-              <GuardSalaryPanel
-                guard={g}
-                society={society}
-                config={salaryConfig[g.id]}
-                payments={payments[g.id] ?? []}
-                onChange={() => loadSalary(society)}
-              />
-            </Card>
-          ))
-        )}
-      </div>
-    </div>
+      )}
+    </AddPanel>
   );
 }
 
-function GuardSalaryPanel({
+function SalaryPanel({
   guard,
   society,
   config,
@@ -151,26 +187,27 @@ function GuardSalaryPanel({
   society: string;
   config?: GuardSalaryConfig;
   payments: GuardSalaryPayment[];
-  onChange: () => void;
+  onChange: (message?: string) => void;
 }) {
-  const [amount, setAmount] = useState(config ? String(config.monthly_amount) : "");
-  const [savingConfig, setSavingConfig] = useState(false);
+  const [mode, setMode] = useState<"idle" | "pay" | "set">("idle");
+  const [amount, setAmount] = useState("");
+  // The amount saved from this panel, used until the reloaded config arrives — so "Pay salary" is pre-filled right away.
+  const [justSaved, setJustSaved] = useState<number | null>(null);
+  const monthly = justSaved ?? config?.monthly_amount ?? null;
   const [pay, setPay] = useState({ amount: "", note: "", early: false });
-  const [logging, setLogging] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  // Re-sync the amount field when the loaded config changes (e.g. after a reload)
-  // without clobbering it while the office bearer is mid-edit — adjusted during
-  // render rather than in an effect, per https://react.dev/learn/you-might-not-need-an-effect.
-  const [syncedAmount, setSyncedAmount] = useState(config?.monthly_amount);
-  if (config?.monthly_amount !== syncedAmount) {
-    setSyncedAmount(config?.monthly_amount);
-    setAmount(config ? String(config.monthly_amount) : "");
+  function open(next: "pay" | "set") {
+    setErr("");
+    if (next === "set") setAmount(monthly !== null ? String(monthly) : "");
+    if (next === "pay") setPay({ amount: monthly !== null ? String(monthly) : "", note: "", early: false });
+    setMode(next);
   }
 
   async function saveConfig(e: React.FormEvent) {
     e.preventDefault();
-    setSavingConfig(true);
+    setBusy(true);
     setErr("");
     try {
       const res = await fetch("/api/guards/salary", {
@@ -179,18 +216,20 @@ function GuardSalaryPanel({
         body: JSON.stringify({ guard_id: guard.id, society_id: society, monthly_amount: Number(amount) }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? "Couldn't save salary.");
-      onChange();
+      if (!res.ok) throw new Error(data?.error ?? "Couldn't save the salary.");
+      setJustSaved(Number(amount));
+      setMode("idle");
+      onChange(`${guard.name}'s monthly salary is now ${inr(Number(amount))}.`);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't save salary.");
+      setErr(e instanceof Error ? e.message : "Couldn't save the salary.");
     } finally {
-      setSavingConfig(false);
+      setBusy(false);
     }
   }
 
   async function logPayment(e: React.FormEvent) {
     e.preventDefault();
-    setLogging(true);
+    setBusy(true);
     setErr("");
     try {
       const res = await fetch("/api/guards/salary/payments", {
@@ -199,74 +238,82 @@ function GuardSalaryPanel({
         body: JSON.stringify({ guard_id: guard.id, society_id: society, amount: Number(pay.amount), early: pay.early, note: pay.note }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? "Couldn't log payment.");
-      setPay({ amount: "", note: "", early: false });
-      onChange();
+      if (!res.ok) throw new Error(data?.error ?? "Couldn't record the payment.");
+      setMode("idle");
+      onChange(`Recorded ${inr(Number(pay.amount))} paid to ${guard.name}. It also appears in Accounts.`);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't log payment.");
+      setErr(e instanceof Error ? e.message : "Couldn't record the payment.");
     } finally {
-      setLogging(false);
+      setBusy(false);
     }
   }
 
   return (
-    <div className="border-t border-zinc-200 pt-4 text-sm dark:border-zinc-800">
-      <p className="mb-2 font-medium text-zinc-700 dark:text-zinc-300">Salary</p>
-      <form onSubmit={saveConfig} className="flex flex-wrap items-center gap-2">
-        <Input
-          required
-          type="number"
-          min={1}
-          className="w-40"
-          placeholder="Monthly amount (₹)"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-        />
-        <Button size="sm" busy={savingConfig} busyText="Saving…">
-          {config ? "Update monthly amount" : "Set monthly amount"}
-        </Button>
-        {config ? <span className="text-xs text-zinc-500">last set {new Date(config.updated_at).toLocaleDateString()}</span> : null}
-      </form>
+    <div className="mt-4 rounded-xl bg-zinc-50 p-4 dark:bg-zinc-900">
+      <p className="text-base">
+        <span className="font-medium">Monthly salary: </span>
+        {monthly !== null ? <span className="font-bold">{inr(monthly)}</span> : <span className="text-zinc-600 dark:text-zinc-400">not set</span>}
+      </p>
+      {payments[0] ? (
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Last paid {inr(payments[0].amount)} on {formatDate(payments[0].created_at)} for {formatPeriod(payments[0].period)}
+        </p>
+      ) : null}
 
-      <form onSubmit={logPayment} className="mt-3 flex flex-wrap items-center gap-2">
-        <Input
-          required
-          type="number"
-          min={1}
-          className="w-32"
-          placeholder="Pay amount (₹)"
-          value={pay.amount}
-          onChange={(e) => setPay({ ...pay, amount: e.target.value })}
-        />
-        <label className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
-          <input type="checkbox" checked={pay.early} onChange={(e) => setPay({ ...pay, early: e.target.checked })} />
-          Early / partial (urgency)
-        </label>
-        <Input
-          className="w-56 flex-1"
-          placeholder={pay.early ? "Reason (required)" : "Note (optional)"}
-          value={pay.note}
-          onChange={(e) => setPay({ ...pay, note: e.target.value })}
-        />
-        <Button size="sm" variant="secondary" busy={logging} busyText="Logging…">
-          Log payment
-        </Button>
-      </form>
-
-      {err ? <p className="mt-2 text-xs text-red-600 dark:text-red-400">{err}</p> : null}
-
-      {payments.length > 0 ? (
-        <div className="mt-3 grid gap-1">
-          {payments.slice(0, 5).map((p) => (
-            <div key={p.id} className="flex flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-              <span className="font-medium text-zinc-800 dark:text-zinc-200">₹{p.amount}</span>
-              <span>for {p.period}</span>
-              {p.early ? <Badge tone="amber">early/partial</Badge> : null}
-              {p.note ? <span className="italic">&quot;{p.note}&quot;</span> : null}
-              <span>{new Date(p.created_at).toLocaleDateString()}</span>
-            </div>
-          ))}
+      {mode === "idle" ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button icon="wallet" onClick={() => open("pay")}>
+            Pay salary
+          </Button>
+          <Button variant="secondary" onClick={() => open("set")}>
+            {monthly !== null ? "Change monthly salary" : "Set monthly salary"}
+          </Button>
         </div>
+      ) : mode === "set" ? (
+        <form onSubmit={saveConfig} className="mt-3 grid gap-3">
+          <Field label="Monthly salary (₹)">
+            <Input required type="number" inputMode="numeric" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
+          </Field>
+          {err ? <ErrorBanner text={err} /> : null}
+          <div className="flex flex-wrap gap-2">
+            <Button icon="check" busy={busy} busyText="Saving…">Save</Button>
+            <Button type="button" variant="secondary" onClick={() => setMode("idle")}>Cancel</Button>
+          </div>
+        </form>
+      ) : (
+        <form onSubmit={logPayment} className="mt-3 grid gap-3">
+          <Field label="Amount paid (₹)">
+            <Input required type="number" inputMode="numeric" min={1} value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} autoFocus />
+          </Field>
+          <label className="flex min-h-12 cursor-pointer items-center gap-3 text-base">
+            <input type="checkbox" className="h-6 w-6 accent-indigo-600" checked={pay.early} onChange={(e) => setPay({ ...pay, early: e.target.checked })} />
+            This is an early or part payment
+          </label>
+          <Field label={pay.early ? "Reason" : "Note"} optional={!pay.early}>
+            <Input required={pay.early} value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} placeholder={pay.early ? "e.g. medical emergency advance" : ""} />
+          </Field>
+          {err ? <ErrorBanner text={err} /> : null}
+          <div className="flex flex-wrap gap-2">
+            <Button icon="check" busy={busy} busyText="Saving…">Record payment</Button>
+            <Button type="button" variant="secondary" onClick={() => setMode("idle")}>Cancel</Button>
+          </div>
+        </form>
+      )}
+
+      {payments.length > 1 ? (
+        <details className="mt-3">
+          <summary className="flex min-h-10 cursor-pointer items-center text-base font-medium text-indigo-700 dark:text-indigo-300">Earlier payments</summary>
+          <ul className="mt-1 grid gap-1 text-base">
+            {payments.slice(1, 8).map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center gap-x-2">
+                <span className="font-semibold">{inr(p.amount)}</span>
+                <span className="text-zinc-600 dark:text-zinc-400">on {formatDate(p.created_at)} for {formatPeriod(p.period)}</span>
+                {p.early ? <Badge tone="amber">early / part</Badge> : null}
+                {p.note ? <span className="italic text-zinc-600 dark:text-zinc-400">“{p.note}”</span> : null}
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
     </div>
   );
