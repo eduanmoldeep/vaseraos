@@ -63,7 +63,7 @@ export default function ResidentHome() {
 
       <DuesCard bills={bills} />
 
-      <HomeCard icon="wrench" title="Problems & repairs">
+      <HomeCard icon="complaint" title="Problems & repairs">
         <p className="text-lg">
           {openComplaints === null
             ? " "
@@ -330,7 +330,7 @@ function VisitorsCard({
   }
 
   return (
-    <HomeCard icon="door" title="Visitors">
+    <HomeCard icon="userCheck" title="Visitors">
       {done ? <div className="mb-3"><SuccessBanner text={done} onClose={() => setDone("")} /></div> : null}
       {flat === null ? (
         <p className="text-lg text-zinc-700 dark:text-zinc-300">

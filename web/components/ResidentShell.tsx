@@ -35,7 +35,7 @@ export function useResident(): ResidentContextValue {
 const NAV: { href: string; label: string; icon: IconName }[] = [
   { href: "/app", label: "Home", icon: "home" },
   { href: "/dues", label: "Dues", icon: "wallet" },
-  { href: "/complaints", label: "Complaints", icon: "wrench" },
+  { href: "/complaints", label: "Complaints", icon: "complaint" },
   { href: "/notices", label: "Notices", icon: "megaphone" },
   { href: "/me", label: "Account", icon: "user" },
 ];

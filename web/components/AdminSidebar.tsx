@@ -37,7 +37,7 @@ export function AdminSidebar() {
                           : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-white"
                       }`}
                     >
-                      <Icon name={n.icon} />
+                      <Icon name={n.icon} className={`h-5 w-5 ${n.color}`} />
                       {n.label}
                     </Link>
                   </li>

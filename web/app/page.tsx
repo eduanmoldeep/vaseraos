@@ -4,15 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthForm } from "@/components/AuthForm";
 import { Icon, type IconName } from "@/components/icons";
-import { Button, Card, ErrorBanner, Field, Input, Tabs } from "@/components/ui";
+import { Button, Card, ErrorBanner, Field, Input, SuccessBanner, Tabs, Textarea } from "@/components/ui";
 import type { AuthUser } from "@/lib/cloudflare";
 
 const FEATURES: { title: string; desc: string; icon: IconName }[] = [
   { title: "Emergency SOS", desc: "One button alerts the guard and committee.", icon: "alert" },
   { title: "Pay maintenance", desc: "Pay by UPI and send the receipt in a few taps.", icon: "wallet" },
-  { title: "Report problems", desc: "Tell the committee and follow the repair.", icon: "wrench" },
+  { title: "Report problems", desc: "Tell the committee and follow the repair.", icon: "complaint" },
   { title: "Notices", desc: "Society announcements, straight to your phone.", icon: "megaphone" },
-  { title: "Visitors", desc: "Let the gate know who is coming.", icon: "door" },
+  { title: "Visitors", desc: "Let the gate know who is coming.", icon: "userCheck" },
   { title: "Committee tools", desc: "Residents, dues, accounts and guards in one place.", icon: "users" },
 ];
 
@@ -125,8 +125,93 @@ export default function Landing() {
         </div>
       </div>
 
+      <LeadForm />
+
       <p className="mt-12 text-center text-sm text-zinc-500 dark:text-zinc-400">VaseraOS · Society management</p>
     </main>
+  );
+}
+
+/** "Want VaseraOS for your society?" — sales enquiry from the public landing page (reviewed in /admin/leads). */
+function LeadForm() {
+  const empty = { name: "", phone: "", email: "", society_name: "", city: "", units: "", message: "", website: "" };
+  const [form, setForm] = useState(empty);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
+  const set = (k: keyof typeof empty) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm({ ...form, [k]: e.target.value });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Couldn't send your details.");
+      setSent(true);
+      setForm(empty);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send your details.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section id="get-in-touch" className="mt-16 grid items-start gap-6 lg:grid-cols-[1fr_28rem]">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Want VaseraOS for your society?</h2>
+        <p className="mt-2 max-w-md text-lg text-zinc-700 dark:text-zinc-300">
+          Leave your details and we&apos;ll get in touch to set up a demo for your society.
+        </p>
+      </div>
+      <Card padding="lg" className="w-full">
+        {sent ? (
+          <>
+            <SuccessBanner text="Thank you — we've got your details and will call you soon." />
+            <Button variant="secondary" onClick={() => setSent(false)} className="mt-4">Send another</Button>
+          </>
+        ) : (
+          <form onSubmit={submit} className="grid gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Your name">
+                <Input required autoComplete="name" value={form.name} onChange={set("name")} maxLength={100} />
+              </Field>
+              <Field label="Phone number">
+                <Input required type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={set("phone")} maxLength={20} />
+              </Field>
+            </div>
+            <Field label="Email" optional>
+              <Input type="email" autoComplete="email" value={form.email} onChange={set("email")} maxLength={120} />
+            </Field>
+            <Field label="Society name" optional>
+              <Input value={form.society_name} onChange={set("society_name")} maxLength={120} />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="City" optional>
+                <Input value={form.city} onChange={set("city")} maxLength={80} />
+              </Field>
+              <Field label="Number of flats" optional>
+                <Input type="number" inputMode="numeric" min={1} value={form.units} onChange={set("units")} />
+              </Field>
+            </div>
+            <Field label="Anything we should know?" optional>
+              <Textarea rows={3} value={form.message} onChange={set("message")} maxLength={1000} />
+            </Field>
+            {/* Honeypot for bots — hidden from people and assistive tech. */}
+            <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" value={form.website} onChange={set("website")} />
+            {error ? <ErrorBanner text={error} /> : null}
+            <Button variant="accent" size="lg" className="w-full" busy={busy} busyText="Sending…">Get in touch</Button>
+          </form>
+        )}
+      </Card>
+    </section>
   );
 }
 

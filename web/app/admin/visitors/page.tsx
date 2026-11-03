@@ -106,7 +106,7 @@ export default function VisitorsPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={s.tone}>{s.label}</Badge>
                   {v.status === "expected" ? (
-                    <Button icon="door" busy={busyId === v.id} busyText="Saving…" onClick={() => move(v, "checked_in")}>
+                    <Button icon="userCheck" busy={busyId === v.id} busyText="Saving…" onClick={() => move(v, "checked_in")}>
                       Let in
                     </Button>
                   ) : v.status === "checked_in" ? (

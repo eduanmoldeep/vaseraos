@@ -80,7 +80,7 @@ export function AdminNav() {
                           aria-current={active ? "page" : undefined}
                           className={`flex min-h-16 items-center gap-3 px-4 py-2.5 ${active ? "bg-indigo-50 dark:bg-indigo-950/40" : ""}`}
                         >
-                          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${active ? "bg-indigo-600 text-white" : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"}`}>
+                          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${active ? "bg-indigo-600 text-white" : `bg-zinc-100 dark:bg-zinc-800 ${n.color}`}`}>
                             <Icon name={n.icon} />
                           </span>
                           <span className="min-w-0 flex-1">

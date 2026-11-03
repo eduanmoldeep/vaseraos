@@ -118,7 +118,7 @@ A near-monochrome zinc palette carries the UI; color is spent only on the accent
 - **Violet** (`#8b5cf6`) — Visitors
 - **Emerald** (`#10b981`) — Notices
 
-**Retired from navigation.** Module dots were replaced by labelled icons (`components/icons.tsx`) in the resident tab bar, admin sidebar and phone menu: a small coloured dot carries meaning only by colour, which fails colour-blind and low-vision users. The colours remain reserved per module if a dot is ever needed again — never promoted to a full background or button colour.
+**Dots became coloured icons.** Navigation uses labelled lucide icons (`components/icons.tsx`, one `Icon name=…` vocabulary for the whole app) instead of bare dots, because a dot carries meaning only by colour, which fails colour-blind and low-vision users. In the committee sidebar and phone menu each section's icon keeps its module colour (`lib/adminNav.ts` → `color`) as a secondary cue; the text label always carries the meaning. Module colours are never promoted to a full background or button colour.
 
 ## Typography
 

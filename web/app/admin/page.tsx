@@ -61,8 +61,8 @@ export default function AdminDashboard() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-3">
           <AttentionCard href="/admin/maintenance" icon="wallet" count={toApprove} one="payment to approve" many="payments to approve" />
-          <AttentionCard href="/admin/complaints" icon="wrench" count={newComplaints} one="new complaint" many="new complaints" />
-          <AttentionCard href="/admin/visitors" icon="door" count={expected} one="visitor expected" many="visitors expected" />
+          <AttentionCard href="/admin/complaints" icon="complaint" count={newComplaints} one="new complaint" many="new complaints" />
+          <AttentionCard href="/admin/visitors" icon="userCheck" count={expected} one="visitor expected" many="visitors expected" />
         </div>
       )}
 

@@ -46,6 +46,7 @@ or holds funds, so it didn't need this.
       (needs Cloudflare Cron Trigger).
 - [ ] Bulk resident import (CSV) for onboarding an existing society.
 - [ ] Audit log — who approved what bill/complaint/notice, for AGM accountability.
+- [ ] Add MCP (Model Context Protocol) to this project.
 
 ## Smaller follow-ups
 
