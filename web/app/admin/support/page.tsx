@@ -61,7 +61,7 @@ export default function SupportPage() {
         <ListSkeleton />
       ) : (
         <>
-          <p className="mb-2 text-sm font-medium">Open ({open.length})</p>
+          <h2 className="mb-3 text-xl font-semibold">Waiting for reply ({open.length})</h2>
           <div className="grid gap-3">
             {open.length === 0 ? (
               <Empty text="No open tickets." />
@@ -70,12 +70,12 @@ export default function SupportPage() {
                 <Card key={t.id} className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-medium">{t.subject}</p>
+                      <p className="text-lg font-semibold">{t.subject}</p>
                       <Badge tone={CATEGORY_TONE[t.category]}>{CATEGORY_LABEL[t.category]}</Badge>
                     </div>
-                    <p className="mt-1 text-sm text-zinc-500">{t.message}</p>
+                    <p className="mt-1 text-base text-zinc-700 dark:text-zinc-300">{t.message}</p>
                   </div>
-                  <Button size="sm" busy={savingId === t.id} onClick={() => setStatus(t.id, "resolved")}>
+                  <Button icon="check" busy={savingId === t.id} onClick={() => setStatus(t.id, "resolved")}>
                     Mark resolved
                   </Button>
                 </Card>
@@ -85,16 +85,16 @@ export default function SupportPage() {
 
           {resolved.length > 0 ? (
             <>
-              <p className="mb-2 mt-6 text-sm font-medium">Resolved ({resolved.length})</p>
+              <h2 className="mb-3 mt-8 text-xl font-semibold">Resolved ({resolved.length})</h2>
               <div className="grid gap-3">
                 {resolved.map((t) => (
-                  <Card key={t.id} className="flex flex-wrap items-center justify-between gap-3 opacity-70">
+                  <Card key={t.id} className="flex flex-wrap items-center justify-between gap-3 opacity-80">
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium">{t.subject}</p>
+                        <p className="text-lg font-semibold">{t.subject}</p>
                         <Badge tone={CATEGORY_TONE[t.category]}>{CATEGORY_LABEL[t.category]}</Badge>
                       </div>
-                      <p className="mt-1 text-sm text-zinc-500">{t.message}</p>
+                      <p className="mt-1 text-base text-zinc-700 dark:text-zinc-300">{t.message}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge tone="green">resolved</Badge>

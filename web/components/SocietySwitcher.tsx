@@ -8,6 +8,7 @@ import { getSelectedSociety, setSelectedSociety, useSelectedSociety } from "@/li
 /**
  * The app's identity control: shows the active society (not the VaseraOS brand)
  * as a workspace-style switcher, since every screen is scoped to one society.
+ * With only one society it's plain text — no pointless dropdown.
  */
 export function SocietySwitcher({ compact = false }: { compact?: boolean }) {
   const [societies, setSocieties] = useState<Society[]>([]);
@@ -19,8 +20,12 @@ export function SocietySwitcher({ compact = false }: { compact?: boolean }) {
       .then((rows: Society[]) => {
         setSocieties(rows);
         const stored = getSelectedSociety();
+        const usable = rows.filter((s) => s.status !== "pending" && s.status !== "rejected");
         if (stored && rows.length > 0 && !rows.some((s) => s.id === stored)) {
-          setSelectedSociety(null);
+          setSelectedSociety(usable[0]?.id ?? null);
+        } else if (!stored && usable.length === 1) {
+          // Only one society to run — pick it so pages don't open on "select a society".
+          setSelectedSociety(usable[0].id);
         }
       })
       .catch(() => {});
@@ -30,30 +35,36 @@ export function SocietySwitcher({ compact = false }: { compact?: boolean }) {
   const initial = name ? name[0].toUpperCase() : "?";
 
   return (
-    <div className={compact ? "flex items-center gap-2" : "flex items-center gap-2.5"}>
-      <span className={`flex ${compact ? "h-7 w-7 text-xs" : "h-8 w-8 text-sm"} shrink-0 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white`}>
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span aria-hidden className={`flex ${compact ? "h-9 w-9" : "h-10 w-10"} shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-base font-bold text-white`}>
         {initial}
       </span>
       <div className="min-w-0 flex-1">
-        <select
-          value={current ?? ""}
-          onChange={(e) => {
-            const id = e.target.value || null;
-            setSelectedSociety(id);
-            window.location.reload();
-          }}
-          className="w-full max-w-44 truncate bg-transparent text-sm font-semibold text-zinc-900 outline-none dark:text-zinc-50"
-          aria-label="Select society"
-        >
-          <option value="">Select society</option>
-          {societies.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        {societies.length > 1 || !current ? (
+          <label className="block">
+            <span className="sr-only">Choose society</span>
+            <select
+              value={current ?? ""}
+              onChange={(e) => {
+                const id = e.target.value || null;
+                setSelectedSociety(id);
+                window.location.reload();
+              }}
+              className="w-full max-w-52 truncate rounded-lg bg-transparent py-1 text-lg font-bold text-zinc-950 outline-none dark:text-zinc-50"
+            >
+              <option value="">Choose society…</option>
+              {societies.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <p className="truncate text-lg font-bold">{name}</p>
+        )}
         {!compact ? (
-          <Link href="/admin/societies" className="block text-xs text-zinc-500 hover:text-indigo-600 hover:underline dark:text-zinc-400">
+          <Link href="/admin/societies" className="block text-sm text-zinc-600 hover:text-indigo-700 hover:underline dark:text-zinc-400">
             Manage societies
           </Link>
         ) : null}

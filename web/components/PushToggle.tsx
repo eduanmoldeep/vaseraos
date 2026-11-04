@@ -1,6 +1,8 @@
 "use client";
 
 import { startTransition, useEffect, useState } from "react";
+import { Icon } from "@/components/icons";
+import { Spinner } from "@/components/ui";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -9,16 +11,18 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 }
 
-/** Push-alerts on/off row for the account dropdown. Handles its own subscribe state. */
+/** "Alerts on this phone" on/off switch. Handles its own subscribe state; explains when it can't work. */
 export function PushToggle() {
-  const [supported, setSupported] = useState(false);
+  const [supported, setSupported] = useState<boolean | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
 
   useEffect(() => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    const ok = "serviceWorker" in navigator && "PushManager" in window;
     startTransition(() => {
-      setSupported(true);
+      setSupported(ok);
+      if (!ok) return;
       fetch("/api/push/subscribe")
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => setSubscribed(!!d?.subscribed))
@@ -28,11 +32,18 @@ export function PushToggle() {
 
   async function enable() {
     setBusy(true);
+    setNote("");
     try {
       const keyRes = await fetch("/api/push/public-key").then((r) => r.json());
-      if (!keyRes?.key) return; // not configured server-side
+      if (!keyRes?.key) {
+        setNote("Alerts aren't available yet for this app.");
+        return;
+      }
       const permission = await Notification.requestPermission();
-      if (permission !== "granted") return;
+      if (permission !== "granted") {
+        setNote("Your phone blocked alerts. Allow notifications for this site in your browser settings, then try again.");
+        return;
+      }
       const registration = await navigator.serviceWorker.register("/sw.js");
       await navigator.serviceWorker.ready;
       const sub = await registration.pushManager.subscribe({
@@ -46,7 +57,7 @@ export function PushToggle() {
       });
       setSubscribed(true);
     } catch {
-      // permission denied, unsupported browser quirk, etc. — leave as off
+      setNote("Couldn't turn on alerts on this phone. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -54,6 +65,7 @@ export function PushToggle() {
 
   async function disable() {
     setBusy(true);
+    setNote("");
     try {
       const registration = await navigator.serviceWorker.getRegistration();
       const sub = await registration?.pushManager.getSubscription();
@@ -71,19 +83,36 @@ export function PushToggle() {
     }
   }
 
-  if (!supported) return null;
+  if (supported === null) return null;
+  if (!supported) {
+    return (
+      <p className="text-base text-zinc-600 dark:text-zinc-400">
+        This browser can&apos;t show alerts. On iPhone, first add this app to your Home Screen (Share → Add to Home Screen) and open it from there.
+      </p>
+    );
+  }
 
   return (
-    <button
-      disabled={busy}
-      onClick={() => (subscribed ? disable() : enable())}
-      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 0 0-4-5.66V5a2 2 0 1 0-4 0v.34A6 6 0 0 0 6 11v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      Push alerts
-      <span className="ml-auto text-xs text-zinc-400">{subscribed ? "On" : "Off"}</span>
-    </button>
+    <div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={subscribed}
+        disabled={busy}
+        onClick={() => (subscribed ? disable() : enable())}
+        className="flex min-h-12 w-full items-center gap-3 rounded-xl px-1 text-left text-base disabled:opacity-60"
+      >
+        <Icon name="bell" className="h-6 w-6" />
+        <span className="flex-1">
+          <span className="block font-semibold">Alerts on this phone</span>
+          <span className="block text-sm text-zinc-600 dark:text-zinc-400">{subscribed ? "On — you'll get notices and reminders" : "Off"}</span>
+        </span>
+        {busy ? <Spinner /> : null}
+        <span aria-hidden className={`relative h-8 w-14 shrink-0 rounded-full transition ${subscribed ? "bg-green-600" : "bg-zinc-300 dark:bg-zinc-700"}`}>
+          <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${subscribed ? "left-7" : "left-1"}`} />
+        </span>
+      </button>
+      {note ? <p className="mt-2 text-sm text-red-700 dark:text-red-400">{note}</p> : null}
+    </div>
   );
 }

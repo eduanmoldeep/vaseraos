@@ -11,10 +11,10 @@ export default function AboutPage() {
           </span>
           <div>
             <p className="font-semibold">VaseraOS</p>
-            <p className="text-sm text-zinc-500">Society management, minus the paperwork.</p>
+            <p className="text-base text-zinc-600 dark:text-zinc-400">Society management, minus the paperwork.</p>
           </div>
         </div>
-        <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 text-base text-zinc-700 dark:text-zinc-300">
           Residents, maintenance, complaints, visitors and notices — one fast, installable app per
           society, scoped so every tenant only ever sees its own data.
         </p>

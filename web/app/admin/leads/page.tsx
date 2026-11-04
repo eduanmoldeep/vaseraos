@@ -66,14 +66,14 @@ export default function LeadsPage() {
               <button
                 key={c.value}
                 onClick={() => setFilter(c.value)}
-                className={`rounded-xl border px-3 py-2 text-left transition ${
+                className={`min-h-16 rounded-xl border-2 px-3 py-2 text-left transition ${
                   filter === c.value
                     ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-900"
                     : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
                 }`}
               >
-                <p className="text-xs text-zinc-500">{c.label}</p>
-                <p className="text-lg font-semibold">{c.n}</p>
+                <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{c.label}</p>
+                <p className="text-2xl font-bold">{c.n}</p>
               </button>
             ))}
           </div>
@@ -90,29 +90,29 @@ export default function LeadsPage() {
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="font-medium">{l.name}</p>
+                          <p className="text-lg font-semibold">{l.name}</p>
                           <Badge tone={meta.tone}>{meta.label}</Badge>
                         </div>
-                        <p className="mt-0.5 text-sm text-zinc-500">
-                          <a href={`tel:${l.phone}`} className="underline">{l.phone}</a>
-                          {l.email ? <> · <a href={`mailto:${l.email}`} className="underline">{l.email}</a></> : null}
+                        <p className="mt-1 text-base text-zinc-700 dark:text-zinc-300">
+                          <a href={`tel:${l.phone}`} className="font-medium text-indigo-700 underline underline-offset-4 dark:text-indigo-300">{l.phone}</a>
+                          {l.email ? <> · <a href={`mailto:${l.email}`} className="underline underline-offset-4">{l.email}</a></> : null}
                         </p>
                       </div>
-                      <p className="text-xs text-zinc-500">{new Date(l.created_at.includes("T") ? l.created_at : l.created_at.replace(" ", "T") + "Z").toLocaleString()}</p>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400">{new Date(l.created_at.includes("T") ? l.created_at : l.created_at.replace(" ", "T") + "Z").toLocaleString()}</p>
                     </div>
                     {l.society_name || l.city || l.units ? (
-                      <p className="mt-2 text-sm">
+                      <p className="mt-2 text-base">
                         {[l.society_name, l.city, l.units ? `${l.units} flats` : null].filter(Boolean).join(" · ")}
                       </p>
                     ) : null}
-                    {l.message ? <p className="mt-1 text-sm text-zinc-500">{l.message}</p> : null}
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    {l.message ? <p className="mt-1 text-base text-zinc-700 dark:text-zinc-300">{l.message}</p> : null}
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
                       {STATUSES.filter((s) => !s.value.startsWith("closed")).map((s) => (
                         <button
                           key={s.value}
                           disabled={savingId === l.id || status === s.value}
                           onClick={() => setStatus(l.id, s.value)}
-                          className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition disabled:cursor-default ${
+                          className={`min-h-10 rounded-full border-2 px-4 text-sm font-semibold transition disabled:cursor-default ${
                             status === s.value
                               ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-black"
                               : "border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
@@ -121,7 +121,7 @@ export default function LeadsPage() {
                           {s.label}
                         </button>
                       ))}
-                      <span className="mx-1 h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+                      <span className="mx-1 h-6 w-px bg-zinc-200 dark:bg-zinc-700" />
                       <Button size="sm" variant={status === "closed_won" ? "accent" : "ghost"} disabled={savingId === l.id || status === "closed_won"} onClick={() => setStatus(l.id, "closed_won")}>
                         Closed Won
                       </Button>

@@ -1,55 +1,54 @@
 "use client";
 
 import { startTransition, useEffect, useState } from "react";
-import { Badge, Card, Empty, ErrorBanner, ListSkeleton, PageHeader } from "@/components/ui";
 import { NeedsSociety } from "@/components/NeedsSociety";
-import { useSelectedSociety } from "@/lib/society";
+import { Card, Empty, ErrorBanner, ListSkeleton, PageHeader, ToggleChip } from "@/components/ui";
 import type { Office } from "@/lib/cloudflare";
+import { useSelectedSociety } from "@/lib/society";
 
 type MemberRow = { userId: string; name: string; email: string; offices: Office[] };
 
-const OFFICES: { value: Office; label: string; tone: "blue" | "green" | "amber" }[] = [
-  { value: "president", label: "President", tone: "blue" },
-  { value: "secretary", label: "Secretary", tone: "green" },
-  { value: "treasurer", label: "Treasurer", tone: "amber" },
+const OFFICES: { value: Office; label: string; can: string }[] = [
+  { value: "president", label: "President", can: "Posts notices, plus everything below." },
+  { value: "secretary", label: "Secretary", can: "Runs residents, complaints, visitors, guards and accounts." },
+  { value: "treasurer", label: "Treasurer", can: "Sets the maintenance amount and UPI, adds bills, plus everything a secretary can." },
 ];
 
 export default function RolesPage() {
   const society = useSelectedSociety();
-  const [rows, setRows] = useState<MemberRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<MemberRow[] | null>(null);
   const [error, setError] = useState("");
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
   const load = (id: string | null = society) => {
-    if (!id) { setRows([]); setLoading(false); return; }
-    setLoading(true);
+    if (!id) return;
     setError("");
     fetch(`/api/societies/offices?society=${id}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setRows)
-      .catch(() => setError("Couldn't load roles."))
-      .finally(() => setLoading(false));
+      .catch(() => setError("Couldn't load committee roles."));
   };
-
   useEffect(() => {
     startTransition(() => load(society));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [society]);
 
-  async function toggle(userId: string, office: Office, currentOffices: Office[]) {
-    const key = `${userId}:${office}`;
+  async function toggle(m: MemberRow, office: Office) {
+    const key = `${m.userId}:${office}`;
+    const removing = m.offices.includes(office);
+    if (removing && !confirm(`Remove ${m.name} as ${office}?`)) return;
     setSavingKey(key);
-    const next = currentOffices.includes(office) ? currentOffices.filter((o) => o !== office) : [...currentOffices, office];
+    const next = removing ? m.offices.filter((o) => o !== office) : [...m.offices, office];
     try {
-      await fetch("/api/societies/offices", {
+      const res = await fetch("/api/societies/offices", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ society_id: society, userId, offices: next }),
+        body: JSON.stringify({ society_id: society, userId: m.userId, offices: next }),
       });
-      setRows((prev) => prev.map((r) => (r.userId === userId ? { ...r, offices: next } : r)));
+      if (!res.ok) throw new Error();
+      setRows((prev) => (prev ?? []).map((r) => (r.userId === m.userId ? { ...r, offices: next } : r)));
     } catch {
-      setError("Couldn't update that role. Try again.");
+      setError("Couldn't update that role. Please try again.");
     } finally {
       setSavingKey(null);
     }
@@ -58,52 +57,59 @@ export default function RolesPage() {
   if (!society) {
     return (
       <div>
-        <PageHeader title="Roles" subtitle="President, secretary, treasurer — assign any combination to any member." />
-        <div className="mt-4"><NeedsSociety label="roles" /></div>
+        <PageHeader title="Committee roles" />
+        <NeedsSociety label="committee roles" />
       </div>
     );
   }
 
+  const committee = (rows ?? []).filter((m) => m.offices.length > 0);
+  const others = (rows ?? []).filter((m) => m.offices.length === 0);
+
   return (
     <div>
-      <PageHeader
-        title="Roles"
-        subtitle="President, secretary, treasurer — assign any combination to any member. Privilege moves with the office, not the person."
-      />
+      <PageHeader title="Committee roles" subtitle="Tap a role to give it to someone, tap again to take it away. Anyone can hold more than one." />
+
+      <Card className="mb-6">
+        <dl className="grid gap-3 sm:grid-cols-3">
+          {OFFICES.map((o) => (
+            <div key={o.value}>
+              <dt className="text-base font-semibold">{o.label}</dt>
+              <dd className="text-base text-zinc-600 dark:text-zinc-400">{o.can}</dd>
+            </div>
+          ))}
+        </dl>
+      </Card>
+
       {error ? <div className="mb-4"><ErrorBanner text={error} onRetry={() => load()} /></div> : null}
-      <div className="grid gap-3">
-        {loading ? (
-          <ListSkeleton />
-        ) : rows.length === 0 ? (
-          <Empty text="No members yet — share the society's join code first." />
-        ) : (
-          rows.map((m) => (
-            <Card key={m.userId} className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="font-medium">{m.name}</p>
-                <p className="text-xs text-zinc-500">{m.email}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {OFFICES.map((o) => {
-                  const active = m.offices.includes(o.value);
-                  const busy = savingKey === `${m.userId}:${o.value}`;
-                  return (
-                    <button
-                      key={o.value}
-                      disabled={busy}
-                      onClick={() => toggle(m.userId, o.value, m.offices)}
-                      className="disabled:opacity-50"
-                      aria-pressed={active}
-                    >
-                      <Badge tone={active ? o.tone : "zinc"}>{o.label}</Badge>
-                    </button>
-                  );
-                })}
+
+      {rows === null ? (
+        <ListSkeleton />
+      ) : rows.length === 0 ? (
+        <Empty text="No members have signed up yet." hint="Share your society's invite code first — roles can only go to people with an account." />
+      ) : (
+        <div className="grid gap-3">
+          {[...committee, ...others].map((m) => (
+            <Card key={m.userId}>
+              <p className="text-lg font-semibold">{m.name}</p>
+              <p className="text-base text-zinc-600 dark:text-zinc-400">{m.email}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {OFFICES.map((o) => (
+                  <ToggleChip
+                    key={o.value}
+                    on={m.offices.includes(o.value)}
+                    busy={savingKey === `${m.userId}:${o.value}`}
+                    onClick={() => toggle(m, o.value)}
+                    label={`${m.offices.includes(o.value) ? "Remove" : "Make"} ${m.name} ${o.label}`}
+                  >
+                    {o.label}
+                  </ToggleChip>
+                ))}
               </div>
             </Card>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
