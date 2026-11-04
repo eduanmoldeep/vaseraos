@@ -30,7 +30,7 @@ export default function AuditLogPage() {
 
   return (
     <div>
-      <PageHeader title="Audit log" subtitle="Role, office, bill, complaint and notice actions, plus every admin impersonation — newest first." />
+      <PageHeader title="Audit log" subtitle="Who changed roles, bills, complaints and notices, and every admin log-in-as — newest first." />
       {error ? <div className="mb-4"><ErrorBanner text={error} onRetry={load} /></div> : null}
       <div className="grid gap-2">
         {loading ? (
@@ -41,12 +41,12 @@ export default function AuditLogPage() {
           rows.map((e) => (
             <Card key={e.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
               <div className="min-w-0">
-                <p className="text-sm">
-                  <span className="font-medium">{e.actorName}</span>{" "}
-                  <span className="text-zinc-500">{describe(e.action)}</span>
+                <p className="text-base">
+                  <span className="font-semibold">{e.actorName}</span>{" "}
+                  <span className="text-zinc-700 dark:text-zinc-300">{describe(e.action)}</span>
                   {e.targetName ? <span className="font-medium"> {e.targetName}</span> : null}
                 </p>
-                <p className="mt-0.5 text-xs text-zinc-500">
+                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                   {new Date(e.created_at).toLocaleString()} · IP {e.ip}
                   {e.detail ? ` · ${e.detail}` : ""}
                 </p>

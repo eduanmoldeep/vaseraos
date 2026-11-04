@@ -71,12 +71,12 @@ export function SosWatcher() {
       {active ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-rose-950/80 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl dark:bg-zinc-900">
-            <p className="text-xs font-semibold uppercase tracking-wide text-rose-600">SOS alarm</p>
-            <p className="mt-2 text-xl font-semibold">
+            <p className="text-sm font-bold uppercase tracking-wide text-rose-600">SOS alarm</p>
+            <p className="mt-2 text-2xl font-bold">
               {active.status === "acknowledged" ? "Guard is on the way" : "Resident needs help"}
             </p>
-            <p className="mt-1 text-sm text-zinc-500">Flat {active.flat}</p>
-            <Button variant="danger" className="mt-6 w-full" busy={resolving} busyText="Resolving…" onClick={resolve}>
+            <p className="mt-1 text-3xl font-bold">Flat {active.flat}</p>
+            <Button variant="secondary" size="lg" className="mt-6 w-full" busy={resolving} busyText="Resolving…" onClick={resolve}>
               Mark resolved
             </Button>
           </div>

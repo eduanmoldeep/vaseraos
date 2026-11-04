@@ -1,7 +1,9 @@
 "use client";
 
 import { startTransition, useEffect, useState } from "react";
-import { Button, Card, Empty, ErrorBanner, Input, ListSkeleton, PageHeader } from "@/components/ui";
+import { AddPanel } from "@/components/AddPanel";
+import { Badge, Button, Card, Empty, ErrorBanner, Field, Input, ListSkeleton, PageHeader } from "@/components/ui";
+import { inr } from "@/lib/labels";
 import { ShareJoinCode } from "@/components/ShareJoinCode";
 import type { Society } from "@/lib/cloudflare";
 import { setSelectedSociety, useSelectedSociety } from "@/lib/society";
@@ -51,9 +53,10 @@ export default function SocietiesPage() {
       .catch(() => {});
   }, []);
 
-  async function add(e: React.FormEvent) {
+  async function add(e: React.FormEvent, close: () => void) {
     e.preventDefault();
     setSaving(true);
+    setError("");
     try {
       const res = await fetch("/api/societies", {
         method: "POST",
@@ -63,6 +66,7 @@ export default function SocietiesPage() {
       const created = await res.json().catch(() => null);
       if (!res.ok) throw new Error(created?.error ?? "Couldn't add society.");
       setForm({ name: "", city: "" });
+      close();
       if (created?.id) {
         setSelectedSociety(created.id);
       }
@@ -115,41 +119,38 @@ export default function SocietiesPage() {
         }
       />
       {isPlatformAdmin ? (
-        <Card>
-          <form onSubmit={add} className="grid gap-3 sm:grid-cols-3">
-            <Input
-              required
-              placeholder="Society name (e.g. Greenview Heights)"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-            <Input
-              placeholder="City"
-              value={form.city}
-              onChange={(e) => setForm({ ...form, city: e.target.value })}
-            />
-            <Button busy={saving} busyText="Adding…">Add society</Button>
-          </form>
-        </Card>
+        <AddPanel label="Add a society" icon="building">
+          {(close) => (
+            <form onSubmit={(e) => add(e, close)} className="grid gap-4 sm:grid-cols-2">
+              <Field label="Society name" hint="e.g. Greenview Heights">
+                <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
+              </Field>
+              <Field label="City" optional>
+                <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+              </Field>
+              <Button icon="check" busy={saving} busyText="Adding…" className="sm:col-span-2 sm:w-fit">Add society</Button>
+            </form>
+          )}
+        </AddPanel>
       ) : null}
 
       {error ? <div className="mt-4"><ErrorBanner text={error} onRetry={load} /></div> : null}
 
       {isPlatformAdmin && pending.length > 0 ? (
         <div className="mt-4">
-          <h2 className="mb-2 text-sm font-medium text-zinc-500">Pending approval</h2>
+          <h2 className="mb-3 text-xl font-semibold">Waiting for approval</h2>
           <div className="grid gap-3">
             {pending.map((s) => (
-              <Card key={s.id} className="flex flex-wrap items-center justify-between gap-3 border-amber-200 dark:border-amber-900/50">
+              <Card key={s.id} tone="amber" className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium">{s.name}</p>
-                  <p className="text-xs text-zinc-500">{s.city || "—"} · registered, awaiting approval</p>
+                  <p className="text-lg font-semibold">{s.name}</p>
+                  <p className="text-base text-zinc-700 dark:text-zinc-300">{s.city || "City not given"} · asked to join VaseraOS</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="secondary" size="sm" busy={busyId === s.id} onClick={() => decide(s.id, "approve")}>
+                  <Button icon="check" busy={busyId === s.id} onClick={() => decide(s.id, "approve")}>
                     Approve
                   </Button>
-                  <Button variant="danger" size="sm" busy={busyId === s.id} onClick={() => decide(s.id, "reject")}>
+                  <Button variant="danger" busy={busyId === s.id} onClick={() => { if (confirm(`Reject “${s.name}”?`)) decide(s.id, "reject"); }}>
                     Reject
                   </Button>
                 </div>
@@ -170,17 +171,17 @@ export default function SocietiesPage() {
             return (
               <Card key={s.id} className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium">
+                  <p className="flex flex-wrap items-center gap-2 text-lg font-semibold">
                     {s.name}
-                    {s.id === current ? <span className="ml-2 text-xs font-normal text-green-600">· active</span> : null}
+                    {s.id === current ? <Badge tone="green">Currently open</Badge> : null}
                   </p>
-                  <p className="text-xs text-zinc-500">
-                    {s.city || "—"}
-                    {c ? ` · ${c.residents} residents · ₹${c.dues.toLocaleString("en-IN")} dues · ${c.openComplaints} open tickets · ${c.activeVisitors} visitors` : ""}
+                  <p className="text-base text-zinc-600 dark:text-zinc-400">
+                    {s.city || "City not given"}
+                    {c ? ` · ${c.residents} residents · ${inr(c.dues)} unpaid · ${c.openComplaints} open complaints` : ""}
                   </p>
                   {s.join_code ? (
-                    <p className="mt-1 text-xs text-zinc-500">
-                      Join code: <span className="font-mono font-medium text-zinc-700 dark:text-zinc-300">{s.join_code}</span>
+                    <p className="mt-1 text-base text-zinc-600 dark:text-zinc-400">
+                      Invite code: <span className="font-mono font-bold text-zinc-950 dark:text-white">{s.join_code}</span>
                     </p>
                   ) : null}
                 </div>
@@ -190,10 +191,10 @@ export default function SocietiesPage() {
                       Generate join code
                     </Button>
                   ) : null}
-                  {s.join_code ? <ShareJoinCode societyName={s.name} joinCode={s.join_code} /> : null}
+                  {s.join_code ? <ShareJoinCode societyName={s.name} joinCode={s.join_code} size="sm" /> : null}
                   {s.id !== current ? (
                     <Button variant="secondary" size="sm" onClick={() => select(s.id)}>
-                      Switch to
+                      Open this society
                     </Button>
                   ) : null}
                   <Button variant="danger" size="sm" onClick={() => remove(s.id, s.name)} aria-label={`Delete society ${s.name}`}>
